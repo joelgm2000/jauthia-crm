@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+backend/lib
+**/lib
+**/.angular
+**/.env
+backend/.pgdata
+.git
+.vscode
+.claude
+qa
+backups
+*.tgz

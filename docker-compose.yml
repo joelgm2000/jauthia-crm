@@ -1,0 +1,55 @@
+# Despliegue en el VPS:  docker compose up -d --build
+# Requiere el archivo .env (copia .env.example) y un dominio apuntando a la IP del servidor.
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: jauthia_crm
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d jauthia_crm"]
+      interval: 10s
+      retries: 10
+    # Sin "ports": la base de datos NO queda expuesta a internet.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/jauthia_crm
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
+      CORS_ORIGINS: https://${DOMAIN}
+      PUBLIC_BASE_URL: https://${DOMAIN}
+      SECRETS_KEY: ${SECRETS_KEY:?Define SECRETS_KEY en .env}
+      PLATFORM_OWNER_EMAIL: ${PLATFORM_OWNER_EMAIL:?Define PLATFORM_OWNER_EMAIL en .env}
+      WEBCHAT_ORIGINS: ${WEBCHAT_ORIGINS:-*}
+      # Caddy está delante: se confía en UN salto para leer la IP real (bloqueos por IP).
+      TRUST_PROXY: "1"
+    # Solo Caddy llega a la app (red interna).
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Define DOMAIN en .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

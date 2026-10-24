@@ -1,0 +1,194 @@
+<header class="topbar">
+  <div class="logo">J</div>
+  <div><b>JAUTHIA</b><small>Panel de la plataforma</small></div>
+  <span class="spacer"></span>
+  <span class="who"><b>{{ auth.user()?.name }}</b><small>{{ auth.isOwner() ? 'Dueño de la plataforma' : 'Super administrador' }}</small></span>
+  <button class="btn sm ghost" (click)="logout()"><app-icon name="logout" [size]="15" /> Salir</button>
+</header>
+
+<div class="toasts">
+  @for (t of store.toasts(); track t.id) {
+    <div class="toast" [class]="'toast ' + t.kind" (click)="store.dismissToast(t.id)">{{ t.text }}</div>
+  }
+</div>
+
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1>Plataforma JAUTHIA</h1>
+      <p>Tus clientes, lo que contrataron y sus mensualidades.</p>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn primary" (click)="create()"><app-icon name="plus" [size]="15" /> Nuevo cliente</button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi card"><small>Clientes activos</small><b>{{ kpis().activos }}</b></div>
+    <div class="kpi card"><small>En prueba</small><b>{{ kpis().prueba }}</b>@if (kpis().pruebasVencidas) { <span class="badge warn">{{ kpis().pruebasVencidas }} vencida(s)</span> }</div>
+    <div class="kpi card"><small>Suspendidos</small><b>{{ kpis().suspendidos }}</b></div>
+    <div class="kpi card"><small>Ingreso mensual (activos)</small><b>{{ kpis().mrr | cop }}</b></div>
+    <div class="kpi card"><small>Cobros en los próximos 7 días</small><b>{{ kpis().porCobrar }}</b></div>
+  </div>
+
+  <div class="row wrap filters">
+    <input class="input" style="max-width:280px" placeholder="Buscar cliente, contacto, ciudad…" [ngModel]="q()" (ngModelChange)="q.set($event)" />
+    @for (s of [['todos','Todos'],['activo','Activos'],['prueba','En prueba'],['suspendido','Suspendidos']]; track s[0]) {
+      <button class="chip" [class.on]="statusFilter() === s[0]" (click)="statusFilter.set($any(s[0]))">{{ s[1] }}</button>
+    }
+  </div>
+
+  <div class="card table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Cliente</th><th>Contacto</th><th>Contrató</th><th>Plan</th><th>Estado</th><th>Próximo cobro / fin de prueba</th><th>Uso</th><th></th></tr>
+      </thead>
+      <tbody>
+        @for (t of filtered(); track t.id) {
+          <tr>
+            <td><b>{{ t.name }}</b><small class="block">{{ t.city || '—' }} · <code>{{ t.id }}</code></small></td>
+            <td>{{ t.contactName || '—' }}<small class="block">{{ t.contactEmail }} {{ t.contactPhone }}</small></td>
+            <td><span class="chip" [class.on]="t.modules.crm && t.modules.chatbot">{{ modulesLabel(t) }}</span></td>
+            <td>{{ t.plan.name }}<small class="block">{{ t.plan.price | cop }}/mes · día {{ t.plan.billingDay }}</small></td>
+            <td><span class="badge" [class.ok]="t.status === 'activo'" [class.warn]="t.status === 'prueba'" [class.high]="t.status === 'suspendido'">{{ t.status }}</span></td>
+            <td>
+              @let d = t.status === 'prueba' ? t.trialEndsAt : t.nextDueAt;
+              @if (d) { {{ toDate(d) }} @if (dueState(t) === 'vencido') { <span class="badge high">vencido</span> } @else if (dueState(t) === 'pronto') { <span class="badge warn">pronto</span> } } @else { — }
+            </td>
+            <td><small class="block">{{ t.users }} usuario(s) · {{ t.conversations }} chats</small><small class="block">{{ t.lastActivityAt ? ('activo hace ' + (t.lastActivityAt | ago)) : 'sin actividad' }}</small></td>
+            <td class="actions">
+              <button class="btn sm primary" (click)="manage(t)" title="Entrar a configurar flujo, catálogo, WhatsApp…"><app-icon name="external" [size]="13" /> Gestionar</button>
+              <button class="btn sm" (click)="openUsers(t)"><app-icon name="users" [size]="13" /></button>
+              <button class="btn sm" (click)="edit(t)"><app-icon name="edit" [size]="13" /></button>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="8" class="empty">{{ loading() ? 'Cargando…' : 'Aún no tienes clientes. Crea el primero con "Nuevo cliente".' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (auth.isOwner()) {
+    <section class="card supers">
+      <div class="card-head"><app-icon name="sparkles" [size]="16" /><h2>Super administradores</h2><span class="spacer"></span><small class="muted">Solo tú (dueño de la plataforma) puedes agregar o quitar super administradores.</small></div>
+      <div class="card-pad col">
+        @for (u of supers(); track u.id) {
+          <div class="row sa">
+            <b>{{ u.name }}</b><span class="muted">{{ u.email }}</span>
+            @if (u.isOwner) { <span class="badge ok">dueño</span> }
+            <span class="spacer"></span>
+            @if (!u.isOwner) { <button class="btn sm ghost danger" (click)="removeSuper(u)"><app-icon name="trash" [size]="13" /> Quitar</button> }
+          </div>
+        }
+        <div class="row wrap add">
+          <input class="input" placeholder="Nombre" [(ngModel)]="ns.name" />
+          <input class="input" type="email" placeholder="correo@empresa.com" [(ngModel)]="ns.email" />
+          <input class="input" type="password" autocomplete="new-password" placeholder="Contraseña (mín. 10)" [(ngModel)]="ns.password" />
+          <button class="btn" (click)="addSuper()"><app-icon name="plus" [size]="13" /> Agregar super admin</button>
+        </div>
+      </div>
+    </section>
+  }
+</div>
+
+<!-- ===================== Modal cliente ===================== -->
+@if (editing(); as t) {
+  <div class="overlay" (click)="editing.set(null)">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-head"><app-icon name="users" /><h2>{{ isNew() ? 'Nuevo cliente' : t.name }}</h2><span class="spacer"></span><button class="btn ghost icon-only sm" (click)="editing.set(null)"><app-icon name="x" /></button></div>
+      <div class="modal-body">
+        <h3>Empresa</h3>
+        <div class="grid-3">
+          <div class="field"><label>Nombre comercial *</label><input class="input" [(ngModel)]="t.name" /></div>
+          <div class="field"><label>NIT / documento</label><input class="input" [(ngModel)]="t.legalId" /></div>
+          <div class="field"><label>Ciudad</label><input class="input" [(ngModel)]="t.city" /></div>
+        </div>
+        <div class="field"><label>Dirección</label><input class="input" [(ngModel)]="t.address" /></div>
+        <h3>Contacto</h3>
+        <div class="grid-3">
+          <div class="field"><label>Nombre</label><input class="input" [(ngModel)]="t.contactName" /></div>
+          <div class="field"><label>Correo</label><input class="input" type="email" [(ngModel)]="t.contactEmail" /></div>
+          <div class="field"><label>Teléfono / WhatsApp</label><input class="input" [(ngModel)]="t.contactPhone" /></div>
+        </div>
+
+        <h3>Qué contrató</h3>
+        <div class="modules">
+          <label class="mod" [class.on]="t.modules.crm"><input type="checkbox" [(ngModel)]="t.modules.crm" /> <b>CRM</b><small>Bandeja omnicanal, embudo, contactos, tareas y resumen.</small></label>
+          <label class="mod" [class.on]="t.modules.chatbot"><input type="checkbox" [(ngModel)]="t.modules.chatbot" /> <b>Chatbot</b><small>Bot con flujo personalizado, catálogo, carruseles y plantillas.</small></label>
+        </div>
+
+        <h3>Plan mensual</h3>
+        <div class="grid-3">
+          <div class="field"><label>Nombre del plan</label><input class="input" [(ngModel)]="t.plan.name" /></div>
+          <div class="field"><label>Mensualidad</label><input class="input" type="number" min="0" [(ngModel)]="t.plan.price" /></div>
+          <div class="field"><label>Moneda</label><select class="select" [(ngModel)]="t.plan.currency"><option>COP</option><option>USD</option><option>MXN</option><option>PEN</option></select></div>
+        </div>
+        <div class="grid-3">
+          <div class="field"><label>Día de cobro (1–28)</label><input class="input" type="number" min="1" max="28" [(ngModel)]="t.plan.billingDay" /></div>
+          <div class="field"><label>Estado</label>
+            <select class="select" [(ngModel)]="t.status"><option value="prueba">En prueba</option><option value="activo">Activo</option><option value="suspendido">Suspendido (no puede entrar)</option></select></div>
+          @if (t.status === 'prueba') {
+            <div class="field"><label>Fin de la prueba</label><input class="input" type="date" [ngModel]="toDate(t.trialEndsAt)" (ngModelChange)="t.trialEndsAt = fromDate($event)" /></div>
+          } @else {
+            <div class="field"><label>Próximo cobro</label><input class="input" type="date" [ngModel]="toDate(t.nextDueAt)" (ngModelChange)="t.nextDueAt = fromDate($event)" /></div>
+          }
+        </div>
+        <div class="field"><label>Notas internas</label><textarea class="textarea" [(ngModel)]="t.notes" placeholder="Acuerdos, forma de pago, observaciones…"></textarea></div>
+
+        @if (isNew()) {
+          <h3>Arranque</h3>
+          <div class="grid-2">
+            <div class="field"><label>Plantilla de flujo del bot</label>
+              <select class="select" [(ngModel)]="flowTemplate">
+                <option value="generico">Genérico (cualquier negocio)</option>
+                <option value="evosport">Gimnasio / máquinas (como EvoSport)</option>
+              </select></div>
+            @if (flowTemplate === 'evosport') {
+              <label class="row" style="margin-top:22px"><input type="checkbox" [(ngModel)]="sampleCatalog" /> Cargar el catálogo de ejemplo de EvoSport</label>
+            }
+          </div>
+          <div class="grid-3">
+            <div class="field"><label>Administrador del cliente (nombre)</label><input class="input" [(ngModel)]="adminName" /></div>
+            <div class="field"><label>Correo del administrador</label><input class="input" type="email" [(ngModel)]="adminEmail" /></div>
+            <div class="field"><label>Contraseña inicial (mín. 10)</label><input class="input" type="password" autocomplete="new-password" [(ngModel)]="adminPassword" /></div>
+          </div>
+          <small class="muted">El administrador del cliente podrá crear a sus asesores. Tú puedes entrar con "Gestionar" para dejarle todo configurado.</small>
+        } @else {
+          <div class="danger-zone">
+            <b>Eliminar cliente</b>
+            <small>Borra para siempre sus conversaciones, catálogo, usuarios y configuración. Escribe <b>{{ t.name }}</b> para confirmar.</small>
+            <div class="row"><input class="input" [(ngModel)]="confirmDelete" [placeholder]="t.name" /><button class="btn danger" [disabled]="confirmDelete !== t.name" (click)="remove()"><app-icon name="trash" [size]="14" /> Eliminar</button></div>
+          </div>
+        }
+      </div>
+      <div class="modal-foot">
+        <button class="btn" (click)="editing.set(null)">Cancelar</button>
+        <button class="btn primary" (click)="save()">{{ isNew() ? 'Crear cliente' : 'Guardar' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===================== Modal usuarios del cliente ===================== -->
+@if (usersOf(); as t) {
+  <div class="overlay" (click)="usersOf.set(null)">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-head"><app-icon name="users" /><h2>Usuarios de {{ t.name }}</h2><span class="spacer"></span><button class="btn ghost icon-only sm" (click)="usersOf.set(null)"><app-icon name="x" /></button></div>
+      <div class="modal-body">
+        @for (u of tenantUsers(); track u.id) {
+          <div class="row sa"><b>{{ u.name }}</b><span class="muted">{{ u.email }}</span><span class="spacer"></span><span class="badge info">{{ u.role }}</span>@if (!u.active) { <span class="badge gray">inactivo</span> }</div>
+        } @empty { <small class="muted">Sin usuarios todavía.</small> }
+        <div class="add col">
+          <b>Agregar usuario</b>
+          <div class="grid-2">
+            <input class="input" placeholder="Nombre" [(ngModel)]="nu.name" />
+            <input class="input" type="email" placeholder="correo@empresa.com" [(ngModel)]="nu.email" />
+            <input class="input" type="password" autocomplete="new-password" placeholder="Contraseña (mín. 10)" [(ngModel)]="nu.password" />
+            <select class="select" [(ngModel)]="nu.role"><option value="admin">Administrador del cliente</option><option value="asesor">Asesor</option></select>
+          </div>
+          <button class="btn primary" style="align-self:flex-start" (click)="addTenantUser()"><app-icon name="plus" [size]="13" /> Crear usuario</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

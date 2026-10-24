@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="800" height="600">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#27272a"/><stop offset="1" stop-color="#3f3f46"/></linearGradient>
+<linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#15181e"/></linearGradient></defs>
+<rect width="400" height="300" fill="url(#g)"/>
+<circle cx="330" cy="60" r="90" fill="#fff" opacity=".08"/><circle cx="60" cy="270" r="70" fill="#fff" opacity=".06"/>
+<ellipse cx="200" cy="262" rx="150" ry="10" fill="#000" opacity=".18"/>
+<g stroke-linecap="round" stroke-linejoin="round"><g transform="translate(200 210) scale(1 .5) rotate(45)"><rect x="-90" y="-90" width="90" height="90" fill="#111" stroke="#333" stroke-width="3"/><rect x="0" y="-90" width="90" height="90" fill="#1c1c1c" stroke="#333" stroke-width="3"/><rect x="-90" y="0" width="90" height="90" fill="#1c1c1c" stroke="#333" stroke-width="3"/><rect x="0" y="0" width="90" height="90" fill="#ff6b1a" stroke="#333" stroke-width="3"/></g></g>
+<text x="20" y="34" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#fff" opacity=".9" letter-spacing="2">EVOSPORT</text>
+<text x="20" y="54" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#fff" opacity=".75">Piso de caucho</text>
+</svg>

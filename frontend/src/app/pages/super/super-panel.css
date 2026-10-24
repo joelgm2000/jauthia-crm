@@ -1,0 +1,22 @@
+.topbar { display: flex; align-items: center; gap: 10px; padding: 12px 24px; background: var(--side); color: #fff; }
+.topbar small { display: block; color: var(--side-text); font-size: 12px; }
+.topbar .who { text-align: right; }
+.topbar .btn { color: var(--side-text); }
+.logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; background: linear-gradient(135deg, #ff6b1a, #ff3d6e); }
+.filters { margin-bottom: 12px; }
+.block { display: block; }
+code { font-size: 11px; background: var(--hover); padding: 1px 5px; border-radius: 4px; }
+.actions { white-space: nowrap; }
+.actions .btn { margin-left: 4px; }
+.supers { margin-top: 18px; }
+.sa { padding: 8px 0; border-bottom: 1px solid var(--line); gap: 10px; }
+.add { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); gap: 8px; }
+.add .input { max-width: 240px; }
+.modal-body h3 { margin-top: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.modules { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mod { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+.mod small { grid-column: 2; color: var(--muted); }
+.mod.on { border-color: var(--brand); background: var(--brand-soft); }
+.danger-zone { border: 1px solid #fecaca; background: #fef2f2; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; color: #7f1d1d; }
+:root[data-theme='dark'] .danger-zone { background: #2a1111; border-color: #5a1f1f; color: #fca5a5; }
+@media (max-width: 1000px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .modules { grid-template-columns: 1fr; } }

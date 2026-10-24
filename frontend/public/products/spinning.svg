@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="800" height="600">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c2d12"/><stop offset="1" stop-color="#c2410c"/></linearGradient>
+<linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#15181e"/></linearGradient></defs>
+<rect width="400" height="300" fill="url(#g)"/>
+<circle cx="330" cy="60" r="90" fill="#fff" opacity=".08"/><circle cx="60" cy="270" r="70" fill="#fff" opacity=".06"/>
+<ellipse cx="200" cy="262" rx="150" ry="10" fill="#000" opacity=".18"/>
+<g stroke-linecap="round" stroke-linejoin="round"><path d="M110 252 L290 252" stroke="#15181e" stroke-width="14"/>
+<circle cx="260" cy="200" r="42" fill="url(#m)"/><circle cx="260" cy="200" r="30" fill="none" stroke="#94a3b8" stroke-width="4"/>
+<path d="M140 250 L200 150 L260 200" stroke="#e2e8f0" stroke-width="10" fill="none"/>
+<path d="M200 150 L190 105" stroke="#e2e8f0" stroke-width="9"/><path d="M168 100 L215 100" stroke="#111" stroke-width="12"/>
+<path d="M245 175 L270 110" stroke="#e2e8f0" stroke-width="9"/><path d="M255 108 L300 102" stroke="#ff6b1a" stroke-width="9"/></g>
+<text x="20" y="34" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#fff" opacity=".9" letter-spacing="2">EVOSPORT</text>
+<text x="20" y="54" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#fff" opacity=".75">Bicicletas de spinning</text>
+</svg>

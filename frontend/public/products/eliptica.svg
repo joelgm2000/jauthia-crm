@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="800" height="600">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#312e81"/><stop offset="1" stop-color="#4338ca"/></linearGradient>
+<linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#15181e"/></linearGradient></defs>
+<rect width="400" height="300" fill="url(#g)"/>
+<circle cx="330" cy="60" r="90" fill="#fff" opacity=".08"/><circle cx="60" cy="270" r="70" fill="#fff" opacity=".06"/>
+<ellipse cx="200" cy="262" rx="150" ry="10" fill="#000" opacity=".18"/>
+<g stroke-linecap="round" stroke-linejoin="round"><path d="M90 250 L310 250" stroke="#15181e" stroke-width="16"/>
+<circle cx="120" cy="210" r="38" fill="url(#m)"/><circle cx="120" cy="210" r="14" fill="#ff6b1a"/>
+<path d="M120 210 L250 240" stroke="#cbd5e1" stroke-width="8"/><rect x="225" y="232" width="50" height="10" rx="4" fill="#ff6b1a"/>
+<path d="M150 200 L255 100" stroke="#cbd5e1" stroke-width="8"/><path d="M160 210 L275 110" stroke="#94a3b8" stroke-width="6"/>
+<rect x="245" y="88" width="50" height="22" rx="6" fill="url(#m)"/></g>
+<text x="20" y="34" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#fff" opacity=".9" letter-spacing="2">EVOSPORT</text>
+<text x="20" y="54" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#fff" opacity=".75">Elípticas</text>
+</svg>

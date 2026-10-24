@@ -1,0 +1,4 @@
+.pgdata/
+lib/
+node_modules/
+.env

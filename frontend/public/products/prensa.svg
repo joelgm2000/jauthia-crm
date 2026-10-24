@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="800" height="600">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3f3f46"/><stop offset="1" stop-color="#52525b"/></linearGradient>
+<linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#15181e"/></linearGradient></defs>
+<rect width="400" height="300" fill="url(#g)"/>
+<circle cx="330" cy="60" r="90" fill="#fff" opacity=".08"/><circle cx="60" cy="270" r="70" fill="#fff" opacity=".06"/>
+<ellipse cx="200" cy="262" rx="150" ry="10" fill="#000" opacity=".18"/>
+<g stroke-linecap="round" stroke-linejoin="round"><path d="M80 250 L320 250" stroke="#15181e" stroke-width="16"/><path d="M110 250 L290 100" stroke="#cbd5e1" stroke-width="10"/>
+<rect x="225" y="120" width="60" height="50" rx="6" fill="url(#m)" transform="rotate(-40 255 145)"/>
+<rect x="290" y="88" width="16" height="50" rx="4" fill="#ff6b1a"/><path d="M100 200 L170 240" stroke="#111" stroke-width="16"/><path d="M95 205 L80 150" stroke="#111" stroke-width="14"/></g>
+<text x="20" y="34" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#fff" opacity=".9" letter-spacing="2">EVOSPORT</text>
+<text x="20" y="54" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#fff" opacity=".75">Prensas</text>
+</svg>

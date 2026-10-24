@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="800" height="600">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#334155"/></linearGradient>
+<linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#15181e"/></linearGradient></defs>
+<rect width="400" height="300" fill="url(#g)"/>
+<circle cx="330" cy="60" r="90" fill="#fff" opacity=".08"/><circle cx="60" cy="270" r="70" fill="#fff" opacity=".06"/>
+<ellipse cx="200" cy="262" rx="150" ry="10" fill="#000" opacity=".18"/>
+<g stroke-linecap="round" stroke-linejoin="round"><path d="M80 245 L320 225 L330 245 L90 262 Z" fill="url(#m)"/><path d="M95 240 L315 222" stroke="#ff6b1a" stroke-width="5"/>
+<path d="M290 228 L265 110" stroke="#cbd5e1" stroke-width="10"/><path d="M300 228 L278 110" stroke="#94a3b8" stroke-width="6"/>
+<rect x="230" y="92" width="80" height="34" rx="8" fill="url(#m)"/><rect x="242" y="100" width="40" height="16" rx="3" fill="#38bdf8" opacity=".9"/>
+<path d="M235 118 L190 140" stroke="#cbd5e1" stroke-width="7"/></g>
+<text x="20" y="34" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#fff" opacity=".9" letter-spacing="2">EVOSPORT</text>
+<text x="20" y="54" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#fff" opacity=".75">Trotadoras</text>
+</svg>

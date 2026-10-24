@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="800" height="600">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#422006"/><stop offset="1" stop-color="#854d0e"/></linearGradient>
+<linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#15181e"/></linearGradient></defs>
+<rect width="400" height="300" fill="url(#g)"/>
+<circle cx="330" cy="60" r="90" fill="#fff" opacity=".08"/><circle cx="60" cy="270" r="70" fill="#fff" opacity=".06"/>
+<ellipse cx="200" cy="262" rx="150" ry="10" fill="#000" opacity=".18"/>
+<g stroke-linecap="round" stroke-linejoin="round"><circle cx="150" cy="180" r="70" fill="url(#m)"/><circle cx="150" cy="180" r="50" fill="none" stroke="#475569" stroke-width="4"/><circle cx="150" cy="180" r="12" fill="#e2e8f0"/>
+<circle cx="270" cy="200" r="52" fill="#ff6b1a"/><circle cx="270" cy="200" r="36" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="3"/><circle cx="270" cy="200" r="10" fill="#e2e8f0"/></g>
+<text x="20" y="34" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#fff" opacity=".9" letter-spacing="2">EVOSPORT</text>
+<text x="20" y="54" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#fff" opacity=".75">Discos</text>
+</svg>

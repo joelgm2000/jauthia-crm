@@ -1,0 +1,126 @@
+@if (d(); as d) {
+  <div class="page" style="max-width:1080px">
+    <div class="page-head">
+      <div><h1>Remarketing y alertas</h1><p>Mensajes automáticos para recuperar a los clientes que dejan de contestar.</p></div>
+      <span class="spacer"></span>
+      <button class="btn primary" [disabled]="!dirty()" (click)="save()"><app-icon name="check" [size]="15" /> Guardar</button>
+    </div>
+
+    <!-- ============ Remarketing ============ -->
+    <section class="card">
+      <div class="card-head">
+        <h2>Remarketing</h2>
+        <span class="spacer"></span>
+        <label class="row"><span class="switch"><input type="checkbox" [(ngModel)]="d.remarketing.enabled" (ngModelChange)="touch()" /><span></span></span> Activo</label>
+      </div>
+      <div class="card-pad col" [class.off]="!d.remarketing.enabled">
+        <p class="muted sm">Si el cliente deja de contestar, el bot le escribe automáticamente en cada paso. Cuando el cliente responde, el conteo vuelve a empezar.</p>
+
+        <div class="field"><label>Aplica a los clientes en estas etapas</label>
+          <div class="chips">
+            @for (s of openStages; track s.id) {
+              <button class="chip" [class.on]="d.remarketing.stages.includes(s.id)" (click)="toggleStage(d.remarketing.stages, s.id)">
+                <i [style.background]="s.color"></i>{{ s.name }}</button>
+            }
+          </div>
+        </div>
+        <label class="row sm"><span class="switch"><input type="checkbox" [(ngModel)]="d.remarketing.withAdvisor" (ngModelChange)="touch()" /><span></span></span>
+          También cuando un asesor ya está atendiendo la conversación</label>
+
+        @for (s of d.steps; track $index) {
+          <div class="step">
+            <div class="step-n">{{ $index + 1 }}</div>
+            <div class="col" style="gap:10px;min-width:0">
+              <div class="grid-3">
+                <div class="field"><label>Horas sin contestar</label><input class="input" type="number" min="0.25" step="0.5" [(ngModel)]="s.afterHours" (ngModelChange)="touch()" /></div>
+                <div class="field"><label>Imagen (opcional)</label>
+                  <select class="select" [(ngModel)]="s.imageUrl" (ngModelChange)="touch()">
+                    <option [ngValue]="undefined">Sin imagen</option>
+                    <option [ngValue]="productImage">✨ Foto del producto que le interesa</option>
+                    @for (p of productImages(); track p.url) { <option [ngValue]="p.url">📷 {{ p.name }}</option> }
+                  </select></div>
+                <div class="field"><label>…o enlace https de la imagen</label><input class="input" placeholder="https://…" [ngModel]="s.imageUrl === productImage ? '' : s.imageUrl" (ngModelChange)="s.imageUrl = $event || undefined; touch()" /></div>
+              </div>
+              <div class="field"><label>Mensaje</label><textarea class="textarea" rows="2" [(ngModel)]="s.message" (ngModelChange)="touch()"></textarea></div>
+              @if (needsTemplate(s)) {
+                <div class="field"><label>Plantilla de WhatsApp (obligatoria después de 24 h)</label>
+                  <select class="select" [(ngModel)]="s.templateId" (ngModelChange)="touch()">
+                    <option [ngValue]="undefined">— Sin plantilla: en WhatsApp este paso se omite —</option>
+                    @for (t of templates(); track t.id) { <option [ngValue]="t.id">{{ t.name }} · {{ t.status }}</option> }
+                  </select></div>
+                <div class="warn"><app-icon name="info" [size]="14" />
+                  WhatsApp, Messenger e Instagram no permiten mensajes libres pasadas 24 h del último mensaje del cliente. En WhatsApp se envía la plantilla; en Messenger e Instagram el paso se omite. En el chat web y Telegram sale el mensaje normal.</div>
+                @if (templateStatus(s.templateId); as warn) { <div class="warn"><app-icon name="info" [size]="14" /> {{ warn }}</div> }
+              }
+            </div>
+            <div class="bubble-wrap">
+              <small class="muted">Vista previa</small>
+              <div class="bubble">
+                @if (previewImage(s.imageUrl); as img) { <img [src]="img" alt="" /> }
+                <span>{{ preview(s.message) || '…' }}</span>
+              </div>
+              <button class="btn ghost sm" (click)="removeStep(d, $index)"><app-icon name="trash" [size]="13" /> Quitar</button>
+            </div>
+          </div>
+        }
+        <button class="btn sm" style="align-self:flex-start" [disabled]="d.steps.length >= 10" (click)="addStep(d)"><app-icon name="plus" [size]="13" /> Agregar paso</button>
+
+        <div class="grid-2">
+          <div class="field"><label>Pasar a "Perdido" estas horas después del último paso (0 = nunca)</label>
+            <input class="input" type="number" min="0" [(ngModel)]="d.remarketing.loseAfterHours" (ngModelChange)="touch()" /></div>
+          <div class="vars"><b>Variables:</b> <code>{{ '{' }}nombre{{ '}' }}</code> <code>{{ '{' }}producto{{ '}' }}</code> <code>{{ '{' }}empresa{{ '}' }}</code>
+            <small class="muted">Si falta el nombre, se quita sola.</small></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Alertas de compra ============ -->
+    <section class="card">
+      <div class="card-head">
+        <h2>Alertas de compra</h2>
+        <span class="spacer"></span>
+        <label class="row"><span class="switch"><input type="checkbox" [(ngModel)]="d.social.enabled" (ngModelChange)="touch()" /><span></span></span> Activo</label>
+      </div>
+      <div class="card-pad col" [class.off]="!d.social.enabled">
+        <p class="muted sm">Cuando un cliente compra, se avisa a los leads del tablero que aún no compran y dejaron de contestar. El mensaje solo dice la ciudad del comprador, nunca su nombre. Una venta en un chat de prueba solo avisa a chats de prueba.</p>
+        <div class="grid-3">
+          <div class="field"><label>Cuenta como compra cuando pasa a</label>
+            <select class="select" [(ngModel)]="d.social.triggerStage" (ngModelChange)="touch()">
+              @for (s of purchaseStages; track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+            </select></div>
+          <div class="field"><label>Avisar a quien lleva sin contestar (horas)</label><input class="input" type="number" min="0.25" step="0.5" [(ngModel)]="d.social.inactiveHours" (ngModelChange)="touch()" /></div>
+          <div class="field"><label>Máximo de clientes por venta</label><input class="input" type="number" min="1" max="1000" [(ngModel)]="d.social.maxRecipients" (ngModelChange)="touch()" /></div>
+          <div class="field"><label>Mínimo de horas entre alertas al mismo cliente</label><input class="input" type="number" min="1" [(ngModel)]="d.social.cooldownHours" (ngModelChange)="touch()" /></div>
+          <div class="field"><label>Plantilla de WhatsApp (pasadas 24 h)</label>
+            <select class="select" [(ngModel)]="d.social.templateId" (ngModelChange)="touch()">
+              <option [ngValue]="undefined">— Sin plantilla: se omiten —</option>
+              @for (t of templates(); track t.id) { <option [ngValue]="t.id">{{ t.name }} · {{ t.status }}</option> }
+            </select></div>
+        </div>
+        <div class="field"><label>Etapas que reciben la alerta</label>
+          <div class="chips">
+            @for (s of openStages; track s.id) {
+              <button class="chip" [class.on]="d.social.stages.includes(s.id)" (click)="toggleStage(d.social.stages, s.id)"><i [style.background]="s.color"></i>{{ s.name }}</button>
+            }
+          </div>
+        </div>
+        <div class="row wrap" style="gap:18px">
+          <label class="row sm"><span class="switch"><input type="checkbox" [(ngModel)]="d.social.sameCategoryOnly" (ngModelChange)="touch()" /><span></span></span> Solo a quienes buscaban la misma categoría</label>
+          <label class="row sm"><span class="switch"><input type="checkbox" [(ngModel)]="d.social.includeImage" (ngModelChange)="touch()" /><span></span></span> Adjuntar la foto del producto comprado</label>
+        </div>
+        <div class="step">
+          <div class="step-n">📣</div>
+          <div class="field"><label>Mensaje</label><textarea class="textarea" rows="3" [(ngModel)]="d.social.message" (ngModelChange)="touch()"></textarea>
+            <div class="vars"><code>{{ '{' }}nombre{{ '}' }}</code> <code>{{ '{' }}producto{{ '}' }}</code> <code>{{ '{' }}ciudad_comprador{{ '}' }}</code> <code>{{ '{' }}empresa{{ '}' }}</code></div></div>
+          <div class="bubble-wrap">
+            <small class="muted">Vista previa</small>
+            <div class="bubble">
+              @if (d.social.includeImage && productImages()[0]; as p) { <img [src]="p.url" alt="" /> }
+              <span>{{ preview(d.social.message) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+}

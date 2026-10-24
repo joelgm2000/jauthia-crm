@@ -1,0 +1,76 @@
+<div class="page" style="max-width:1200px">
+  <div class="page-head">
+    <div><h1>Canales</h1><p>Conecta las redes que quieras. Todo llega a la misma bandeja y el bot atiende en cada una con sus formatos interactivos.</p></div>
+  </div>
+  <div class="grid">
+    @for (i of info; track i.id) {
+      @let c = config(i.id);
+      <article class="card ch" [class.off]="!c.enabled" [class.wide]="open() === i.id">
+        <header class="row">
+          <app-channel-icon [channel]="i.id" [size]="38" />
+          <div class="col0">
+            <h2>{{ labels[i.id] }}</h2>
+            @if (!i.available) { <span class="badge gray">Próximamente</span> }
+            @else if (c.connected) { <span class="badge ok">● Conectado{{ c.accountName ? ' · ' + c.accountName : '' }}</span> }
+            @else { <span class="badge warn">Sin conectar</span> }
+          </div>
+          <span class="spacer"></span>
+          @if (i.available) {
+            <label class="switch" title="Mostrar en la bandeja"><input type="checkbox" [ngModel]="c.enabled" (ngModelChange)="patch(c, { enabled: $event })" /><span></span></label>
+          }
+        </header>
+        <p class="muted">{{ i.desc }}</p>
+        @if (i.available) {
+          <div class="meta"><app-icon name="sparkles" [size]="13" /> {{ i.interactive }}</div>
+          @if (auth.modules().chatbot) {
+            <label class="row sm"><span class="switch"><input type="checkbox" [ngModel]="c.botEnabled" (ngModelChange)="patch(c, { botEnabled: $event })" /><span></span></span> El bot responde en este canal</label>
+          }
+          <button class="btn sm" (click)="toggleOpen(i)">{{ open() === i.id ? 'Cerrar' : 'Configurar conexión' }} <app-icon [name]="open() === i.id ? 'chevronLeft' : 'chevronRight'" [size]="13" /></button>
+
+          @if (open() === i.id) {
+            <div class="setup">
+              <ol>@for (s of i.steps; track $index) { <li>{{ s }}</li> }</ol>
+
+              @for (f of i.fields; track f.key) {
+                <div class="field"><label>{{ f.label }}</label>
+                  <input class="input mono" [placeholder]="f.placeholder || ''" [(ngModel)]="pub[i.id][f.key]" />
+                  <small class="muted">{{ f.help }}</small></div>
+              }
+
+              @for (f of i.secrets; track f.key) {
+                <div class="field">
+                  <label><app-icon name="tag" [size]="12" /> {{ f.label }}
+                    @if (saved(i.id, f.key); as m) { <span class="badge ok">guardado {{ m }}</span> <button class="link" (click)="clearSecret(i, f.key)">borrar</button> }
+                  </label>
+                  <input class="input mono" type="password" autocomplete="off" [placeholder]="saved(i.id, f.key) ? 'Escribe solo si quieres cambiarlo' : 'Pega aquí'" [(ngModel)]="draft[i.id][f.key]" />
+                  <small class="muted">{{ f.help }}</small>
+                </div>
+              }
+
+              @if (i.hook) {
+                <div class="field"><label>URL del webhook (pégala en {{ i.hook === 'telegram' ? 'Telegram (se registra sola)' : 'Meta' }})</label>
+                  <div class="row"><input class="input mono" readonly [value]="webhookUrl(i.hook)" /><button class="btn sm icon-only" (click)="copy(webhookUrl(i.hook))" title="Copiar"><app-icon name="copy" [size]="14" /></button></div>
+                  @if (!store.publicBaseUrl().startsWith('https://')) { <small class="warn-txt">Para que Meta o Telegram lleguen, el servidor necesita una URL pública con https (en el VPS).</small> }
+                </div>
+              }
+              @if (i.id === 'webchat') {
+                <div class="field"><label>Código para el sitio web</label>
+                  <div class="row"><input class="input mono" readonly [value]="widgetSnippet()" /><button class="btn sm icon-only" (click)="copy(widgetSnippet())" title="Copiar"><app-icon name="copy" [size]="14" /></button></div>
+                </div>
+              }
+
+              @if (result()[i.id]; as r) {
+                <div class="result" [class.ok]="r.ok"><app-icon [name]="r.ok ? 'check' : 'info'" [size]="15" /> {{ r.message }}</div>
+              }
+              <div class="row">
+                @if (i.fields.length || i.secrets.length) { <button class="btn primary" (click)="save(i)"><app-icon name="check" [size]="14" /> Guardar</button> }
+                <button class="btn" [disabled]="testing() === i.id" (click)="test(i)"><app-icon name="refresh" [size]="14" /> {{ testing() === i.id ? 'Probando…' : 'Probar conexión' }}</button>
+              </div>
+              <small class="muted secure"><app-icon name="info" [size]="12" /> Los tokens se guardan cifrados en el servidor. Nadie (ni siquiera tú desde esta pantalla) puede volver a verlos completos.</small>
+            </div>
+          }
+        }
+      </article>
+    }
+  </div>
+</div>

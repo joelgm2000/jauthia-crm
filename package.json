@@ -1,0 +1,16 @@
+{
+  "name": "jauthia-crm",
+  "private": true,
+  "description": "CRM omnicanal JAUTHIA: frontend Angular + backend Node/Express + PostgreSQL",
+  "scripts": {
+    "install:all": "npm install && npm --prefix frontend install && npm --prefix backend install",
+    "dev": "concurrently -k -n db,api,web -c blue,green,magenta \"npm --prefix backend run db\" \"wait-on tcp:5433 && npm --prefix backend run dev\" \"npm --prefix frontend start\"",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "check:bot": "npx tsx shared/engine.check.ts",
+    "create-admin": "npm --prefix backend run create-admin --"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5",
+    "wait-on": "^8.0.5"
+  }
+}

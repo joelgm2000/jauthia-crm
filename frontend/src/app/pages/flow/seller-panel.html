@@ -1,0 +1,85 @@
+@if (flow(); as f) {
+  @if (f.persona; as p) {
+    <div class="card">
+      <div class="card-head"><h2>Vendedor virtual</h2></div>
+      <div class="card-pad col" style="gap:12px">
+        <div class="hint"><app-icon name="bot" [size]="15" /> Así se presenta y se comporta el bot. Su nombre se usa en los mensajes con <code>{{ '{' }}bot{{ '}' }}</code>; el tono "sobrio" quita los emojis.</div>
+        <div class="grid-3">
+          <div class="field"><label>Nombre del vendedor</label><input class="input" [(ngModel)]="p.botName" (ngModelChange)="touch()" placeholder="Sofía" /></div>
+          <div class="field"><label>Rol</label><input class="input" [(ngModel)]="p.role" (ngModelChange)="touch()" placeholder="asesora comercial virtual" /></div>
+          <div class="field"><label>Tono</label>
+            <select class="select" [(ngModel)]="p.tone" (ngModelChange)="touch()">
+              @for (t of tones; track t) { <option [value]="t">{{ t === 'cercano' ? 'Cercano (con emojis)' : 'Sobrio (sin emojis)' }}</option> }
+            </select></div>
+        </div>
+        <div class="field"><label>Objetivo en cada conversación</label><textarea class="textarea" rows="2" [(ngModel)]="p.objective" (ngModelChange)="touch()"></textarea></div>
+        <div class="field"><label>Reglas del vendedor</label>
+          <div class="col" style="gap:6px">
+            @for (r of p.rules; track $index) {
+              <div class="row"><input class="input" [(ngModel)]="p.rules[$index]" (ngModelChange)="touch()" /><button class="btn ghost icon-only sm" (click)="removeRule($index)" title="Quitar"><app-icon name="x" [size]="14" /></button></div>
+            }
+            <button class="btn sm" style="align-self:flex-start" (click)="addRule()"><app-icon name="plus" [size]="13" /> Regla</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Preguntas básicas · datos obligatorios</h2>
+      </div>
+      <div class="card-pad col" style="gap:12px">
+        <div class="hint"><app-icon name="check" [size]="15" /><span>El vendedor <b>siempre</b> debe conocer estos datos. Los de <b>inicio</b> los pide al comenzar; los demás, <b>antes de pasar al asesor</b>: si el cliente toca "Lo quiero" o pide comprar y falta alguno, el bot lo pregunta primero. Soporte, pagos y "quiero hablar con alguien" pasan de inmediato.</span></div>
+        @for (r of f.required ?? []; track r.key) {
+          <div class="req">
+            <div class="req-n">{{ $index + 1 }}</div>
+            <div class="col" style="gap:8px;min-width:0">
+              <div class="grid-2">
+                <div class="field"><label>Dato</label><input class="input" [(ngModel)]="r.label" (ngModelChange)="touch()" /></div>
+                <div class="field"><label>Cuándo lo pide</label>
+                  <select class="select" [(ngModel)]="r.when" (ngModelChange)="touch()">
+                    <option value="inicio">Al inicio de la conversación</option>
+                    <option value="antes_asesor">Antes de pasar al asesor</option>
+                  </select></div>
+              </div>
+              @if (r.key === 'producto') {
+                <div class="field"><label>Cómo lo pide (muestra el catálogo y el cliente toca "Lo quiero")</label>
+                  <textarea class="textarea" rows="2" [(ngModel)]="f.messages.askWhichProduct" (ngModelChange)="touch()" placeholder="¿Cuál de estas te interesa? Toca *Lo quiero* en la que prefieras 👇"></textarea></div>
+              } @else if (nodeOf(r); as n) {
+                <div class="field"><label>Pregunta que hace el bot{{ r.key === 'nombre' ? ' (saludo inicial)' : '' }}</label>
+                  <textarea class="textarea" rows="2" [(ngModel)]="n.message" (ngModelChange)="touch()"></textarea></div>
+                @if (n.options?.length) { <small class="muted">Botones: {{ n.options!.map(o => o.title).join(' · ') }}</small> }
+              }
+            </div>
+            <div class="req-actions">
+              <button class="btn ghost icon-only sm" [disabled]="$first" (click)="move($index, -1)" title="Subir">▲</button>
+              <button class="btn ghost icon-only sm" [disabled]="$last" (click)="move($index, 1)" title="Bajar">▼</button>
+              <button class="btn ghost icon-only sm" (click)="remove($index)" title="Quitar"><app-icon name="trash" [size]="14" /></button>
+            </div>
+          </div>
+        }
+        @if (available().length) {
+          <div class="row">
+            <select class="select" style="max-width:260px" [(ngModel)]="newKey">
+              <option value="">Agregar un dato obligatorio…</option>
+              @for (k of available(); track k) { <option [value]="k">{{ labels[k] }}</option> }
+            </select>
+            <button class="btn sm" [disabled]="!newKey" (click)="add()"><app-icon name="plus" [size]="13" /> Agregar</button>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Prompt del vendedor</h2>
+        <span class="spacer"></span>
+        <button class="btn sm" (click)="regeneratePrompt()"><app-icon name="refresh" [size]="13" /> Generar con la configuración actual</button>
+      </div>
+      <div class="card-pad col" style="gap:10px">
+        <div class="hint"><app-icon name="info" [size]="15" /> Describe en lenguaje natural lo que hace el vendedor. El bot lo cumple con el flujo (no usa IA); sirve de guía para tu equipo y, si más adelante se activa IA, será su instrucción.</div>
+        <textarea class="textarea mono-prompt" rows="18" [ngModel]="p.prompt || generated()" (ngModelChange)="p.prompt = $event; touch()"></textarea>
+      </div>
+    </div>
+  }
+}

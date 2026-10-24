@@ -1,0 +1,230 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1>Flujo del bot</h1>
+      <p>Todo lo que pregunta, recomienda y decide el asistente de ventas. Cada respuesta se guarda en un campo del CRM.</p>
+    </div>
+    <span class="spacer"></span>
+    @if (dirty()) { <span class="badge warn">Cambios sin guardar</span> <button class="btn" (click)="discard()">Descartar</button> }
+    <button class="btn" (click)="reset()"><app-icon name="refresh" [size]="14" /> Restaurar</button>
+    <a class="btn" routerLink="/inbox"><app-icon name="play" [size]="13" /> Probar</a>
+    <button class="btn primary" [disabled]="!dirty()" (click)="save()"><app-icon name="check" [size]="15" /> Guardar flujo</button>
+  </div>
+
+  <div class="tabs">
+    <button [class.on]="tab() === 'vendedor'" (click)="tab.set('vendedor')">Vendedor y datos básicos</button>
+    <button [class.on]="tab() === 'preguntas'" (click)="tab.set('preguntas')">Preguntas por ruta</button>
+    <button [class.on]="tab() === 'disparadores'" (click)="tab.set('disparadores')">Cuándo pasa al asesor</button>
+    <button [class.on]="tab() === 'faqs'" (click)="tab.set('faqs')">Preguntas frecuentes</button>
+    <button [class.on]="tab() === 'mensajes'" (click)="tab.set('mensajes')">Mensajes y parámetros</button>
+  </div>
+
+  @if (flow(); as f) {
+    @switch (tab()) {
+      @case ('vendedor') {
+        <app-seller-panel [flow]="f" (changed)="touch()" />
+      }
+      @case ('preguntas') {
+        <div class="split">
+          <!-- Mapa del flujo -->
+          <div class="map card card-pad">
+            <div class="entry"><app-icon name="inbox" [size]="14" /> Cliente escribe por cualquier canal</div>
+            <div class="arrow"></div>
+            @for (n of common(); track n.id) {
+              <button class="node" [class.on]="selectedId() === n.id" (click)="selectedId.set(n.id)">
+                <small>{{ n.title }}</small><span>{{ n.message }}</span>
+              </button>
+              <div class="arrow"></div>
+            }
+            <div class="routes">
+              @for (r of routes(); track r.id) {
+                <div class="route" [style.--c]="r.color">
+                  <div class="route-head">{{ r.label }}</div>
+                  @for (n of byRoute(r.id); track n.id) {
+                    <button class="node sm" [class.on]="selectedId() === n.id" (click)="selectedId.set(n.id)">
+                      <small>{{ n.title }}</small>
+                    </button>
+                  }
+                  <button class="add" (click)="addNode(r.id)"><app-icon name="plus" [size]="12" /> Paso</button>
+                </div>
+              }
+              <div class="route new-route" style="--c:#64748b">
+                <div class="route-head">Nueva ruta</div>
+                <input class="input" placeholder="ej: tortas" [(ngModel)]="newRoute" />
+                <button class="add" [disabled]="!newRoute.trim()" (click)="addNode(newRoute.trim().toLowerCase()); newRoute = ''"><app-icon name="plus" [size]="12" /> Crear</button>
+              </div>
+            </div>
+            <div class="arrow"></div>
+            @for (n of finals(); track n.id) {
+              <button class="node final" [class.on]="selectedId() === n.id" (click)="selectedId.set(n.id)">
+                <small>{{ n.kind === 'recommend' ? '🛍️ ' : '🤝 ' }}{{ n.title }}</small><span>{{ n.message }}</span>
+              </button>
+              @if (!$last) { <div class="arrow"></div> }
+            }
+          </div>
+
+          <!-- Editor del paso -->
+          @if (selected(); as n) {
+            <div class="card editor">
+              <div class="card-head">
+                <app-icon name="edit" [size]="15" /> <h2>{{ n.title }}</h2>
+                <span class="badge gray">{{ n.id }}</span>
+                <span class="spacer"></span>
+                @if (n.kind === 'question' && n.id !== f.startNode) {
+                  <button class="btn ghost sm danger" (click)="removeNode(n)"><app-icon name="trash" [size]="13" /></button>
+                }
+              </div>
+              <div class="card-pad col" style="gap:14px">
+                <div class="grid-2">
+                  <div class="field"><label>Título del paso</label><input class="input" [(ngModel)]="n.title" (ngModelChange)="touch()" /></div>
+                  <div class="field"><label>Ruta</label><input class="input" [value]="n.route" disabled /></div>
+                </div>
+                <div class="field"><label>Mensaje del bot</label><textarea class="textarea" [(ngModel)]="n.message" (ngModelChange)="touch()"></textarea></div>
+
+                @if (n.kind === 'question') {
+                  <div class="grid-3">
+                    <div class="field"><label>Cómo se muestra</label>
+                      <select class="select" [(ngModel)]="n.display" (ngModelChange)="touch()">
+                        <option value="text">Solo texto</option><option value="buttons">Botones (máx. 3)</option><option value="list">Lista desplegable (máx. 10)</option>
+                      </select></div>
+                    <div class="field"><label>Cómo interpretar la respuesta</label>
+                      <select class="select" [(ngModel)]="n.parse" (ngModelChange)="touch()">
+                        <option value="choice">Elegir una opción</option><option value="number">Número</option><option value="text">Texto libre</option><option value="name_city">Nombre y ciudad</option><option value="city">Ciudad</option>
+                      </select></div>
+                    <div class="field"><label>Guardar en el campo</label>
+                      <select class="select" [(ngModel)]="n.field" (ngModelChange)="touch()">
+                        <option value="nombre_ciudad">Nombre + ciudad</option>
+                        @for (fd of fields; track fd.key) { <option [value]="fd.key">{{ fd.label }}</option> }
+                      </select></div>
+                  </div>
+                  @if (n.display === 'list') {
+                    <div class="field"><label>Texto del botón de la lista</label><input class="input" [(ngModel)]="n.listButton" (ngModelChange)="touch()" /></div>
+                  }
+                  <div class="field"><label>Siguiente paso (por defecto)</label>
+                    <select class="select" [(ngModel)]="n.next" (ngModelChange)="touch()">
+                      @for (id of nodeIds(); track id) { <option [value]="id">{{ nodeTitle(id) }}</option> }
+                    </select></div>
+
+                  @if (n.parse === 'choice') {
+                    <label class="row"><input type="checkbox" [ngModel]="n.optionsFrom === 'categories'" (ngModelChange)="n.optionsFrom = $event ? 'categories' : undefined; touch()" /> Usar las categorías del catálogo como opciones (se actualizan solas)</label>
+                  }
+                  @if (n.parse === 'choice' && n.optionsFrom !== 'categories') {
+                    <div class="field">
+                      <label>Opciones (botones) — los sinónimos permiten responder escribiendo</label>
+                      <div class="opts">
+                        @for (o of n.options; track $index) {
+                          <div class="opt">
+                            <input class="input" placeholder="Texto del botón" maxlength="24" [(ngModel)]="o.title" (ngModelChange)="touch()" />
+                            <input class="input" placeholder="Valor guardado" [(ngModel)]="o.value" (ngModelChange)="touch()" />
+                            <input class="input wide" placeholder="Sinónimos: casa, hogar…" [ngModel]="(o.synonyms ?? []).join(', ')" (ngModelChange)="o.synonyms = splitList($event); touch()" />
+                            <select class="select" [(ngModel)]="o.next" (ngModelChange)="touch()" title="Si elige esta opción, ir a…">
+                              <option [ngValue]="undefined">→ (por defecto)</option>
+                              @for (id of nodeIds(); track id) { <option [value]="id">→ {{ nodeTitle(id) }}</option> }
+                            </select>
+                            <button class="btn ghost icon-only sm" (click)="removeOption(n, $index)"><app-icon name="x" [size]="14" /></button>
+                          </div>
+                        }
+                      </div>
+                      <button class="btn sm" style="align-self:flex-start" (click)="addOption(n)"><app-icon name="plus" [size]="13" /> Opción</button>
+                    </div>
+                  }
+                }
+                @if (n.kind === 'recommend') {
+                  <div class="hint"><app-icon name="info" [size]="15" /> El bot filtra el catálogo por categoría, equipo, peso del usuario, caminar/trotar y altura del techo, y muestra hasta {{ f.maxOptions }} opciones en un carrusel con <b>Ver detalles</b> y <b>Lo quiero</b>. Si el cliente elige, pasa al asesor con la nota resumen.</div>
+                }
+                @if (n.kind === 'handoff') {
+                  <div class="hint"><app-icon name="info" [size]="15" /> Mueve la conversación a <b>Calificado · asesor asignado</b>, pausa el bot, asigna asesor (rotación) y crea la tarea con la nota resumen. Fuera de horario avisa el horario y deja la tarea para primera hora.</div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @case ('disparadores') {
+        <div class="card">
+          <div class="card-head"><h2>Pasa al asesor sin esperar a que elija</h2><span class="spacer"></span><button class="btn sm" (click)="addTrigger()"><app-icon name="plus" [size]="13" /> Disparador</button></div>
+          <div class="card-pad col" style="gap:12px">
+            <div class="hint"><app-icon name="info" [size]="15" /> El bot no da precios: los precios cambian cada mes y los descuentos los negocia el asesor. Cada disparador suma puntos al <b>puntaje de compra</b>; desde {{ store.settings().hotThreshold }} puntos el cliente se marca 🔥 "a punto de comprar".</div>
+            @for (t of f.triggers; track t.id) {
+              <div class="trigger">
+                <div class="grid-3">
+                  <div class="field"><label>Nombre</label><input class="input" [(ngModel)]="t.label" (ngModelChange)="touch()" /></div>
+                  <div class="field"><label>Intención</label>
+                    <select class="select" [(ngModel)]="t.intent" (ngModelChange)="touch()">
+                      <option value="precio">💲 Precio</option><option value="compra">💳 Compra</option><option value="pago">🧾 Pago</option><option value="soporte">🛠️ Soporte</option><option value="humano">🙋 Humano</option>
+                    </select></div>
+                  <div class="row" style="gap:12px;margin-top:18px">
+                    <div class="field" style="width:90px"><label>Puntos</label><input class="input" type="number" [(ngModel)]="t.score" (ngModelChange)="touch()" /></div>
+                    <div class="field" style="flex:1"><label>Mover a etapa</label>
+                      <select class="select" [(ngModel)]="t.moveTo" (ngModelChange)="touch()">
+                        <option [ngValue]="undefined">No mover</option>
+                        @for (s of stages; track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+                      </select></div>
+                  </div>
+                </div>
+                <div class="field"><label>Palabras clave (separadas por coma)</label><input class="input" [ngModel]="t.keywords.join(', ')" (ngModelChange)="t.keywords = splitList($event); touch()" /></div>
+                <div class="row">
+                  <label class="row"><span class="switch"><input type="checkbox" [(ngModel)]="t.handoff" (ngModelChange)="touch()" /><span></span></span> Pasar al asesor</label>
+                  <span class="spacer"></span>
+                  <button class="btn ghost sm danger" (click)="f.triggers.splice($index, 1); touch()"><app-icon name="trash" [size]="13" /> Quitar</button>
+                </div>
+              </div>
+            }
+            <div class="field"><label>Prioridad alta si menciona (gimnasio o varias máquinas)</label>
+              <input class="input" [ngModel]="f.priorityKeywords.join(', ')" (ngModelChange)="f.priorityKeywords = splitList($event); touch()" /></div>
+          </div>
+        </div>
+      }
+
+      @case ('faqs') {
+        <div class="card">
+          <div class="card-head"><h2>Preguntas frecuentes</h2></div>
+          <div class="card-pad col" style="gap:12px">
+            <div class="hint"><app-icon name="bot" [size]="15" /> Si el cliente pregunta algo en medio de la conversación ("¿hacen envíos?"), el bot responde y vuelve a la pregunta pendiente. Así no pierde el control de la conversación.</div>
+            @for (q of f.faqs ?? []; track q.id) {
+              <div class="faq">
+                <div class="field"><label>Si el cliente escribe (separado por comas)</label>
+                  <input class="input" [ngModel]="q.keywords.join(', ')" (ngModelChange)="q.keywords = splitList($event); touch()" placeholder="envío, domicilio, hacen envíos" /></div>
+                <div class="field"><label>El bot responde</label><textarea class="textarea" [(ngModel)]="q.answer" (ngModelChange)="touch()"></textarea></div>
+                <button class="btn ghost icon-only sm" (click)="removeFaq($index)" title="Quitar"><app-icon name="trash" [size]="14" /></button>
+              </div>
+            }
+            <button class="btn sm" style="align-self:flex-start" (click)="addFaq()"><app-icon name="plus" [size]="13" /> Pregunta frecuente</button>
+            <div class="hint"><app-icon name="clock" [size]="15" /> Los mensajes cuando el cliente deja de contestar se configuran en <a routerLink="/automation">Remarketing y alertas</a>.</div>
+          </div>
+        </div>
+      }
+
+      @case ('mensajes') {
+        <div class="card">
+          <div class="card-head"><h2>Mensajes base del bot</h2></div>
+          <div class="card-pad col" style="gap:12px">
+            <div class="grid-3">
+              <div class="field"><label>Saludo corto (si el primer mensaje ya pide algo)</label><textarea class="textarea" [(ngModel)]="f.messages.greeting" (ngModelChange)="touch()" placeholder="¡Hola! 👋 Gracias por escribir a {empresa}."></textarea></div>
+              <div class="field"><label>Al recibir el nombre ({{ '{' }}nombre{{ '}' }})</label><textarea class="textarea" [(ngModel)]="f.messages.nameAck" (ngModelChange)="touch()" placeholder="Mucho gusto, {nombre} 😊"></textarea></div>
+              <div class="field"><label>Volver al flujo tras una pregunta frecuente</label><textarea class="textarea" [(ngModel)]="f.messages.backToFlow" (ngModelChange)="touch()" placeholder="Ahora sí, sigamos 😊"></textarea></div>
+            </div>
+            <div class="field"><label>Traspaso (con opciones)</label><textarea class="textarea" [(ngModel)]="f.messages.handoff" (ngModelChange)="touch()"></textarea></div>
+            <div class="grid-2">
+              <div class="field"><label>Ver otras opciones</label><textarea class="textarea" [(ngModel)]="f.messages.showOthers" (ngModelChange)="touch()"></textarea></div>
+              <div class="field"><label>No quedan más opciones</label><textarea class="textarea" [(ngModel)]="f.messages.noMoreOptions" (ngModelChange)="touch()"></textarea></div>
+              <div class="field"><label>Ninguna le gusta</label><textarea class="textarea" [(ngModel)]="f.messages.noneLiked" (ngModelChange)="touch()"></textarea></div>
+              <div class="field"><label>No entendió</label><textarea class="textarea" [(ngModel)]="f.messages.notUnderstood" (ngModelChange)="touch()"></textarea></div>
+              <div class="field"><label>Cuando pregunta por un producto</label><textarea class="textarea" [(ngModel)]="f.messages.productIntro" (ngModelChange)="touch()"></textarea></div>
+              <div class="field"><label>Cuando pide precio</label><textarea class="textarea" [(ngModel)]="f.messages.noPrices" (ngModelChange)="touch()"></textarea></div>
+              <div class="field"><label>Traspaso por garantía / soporte</label><textarea class="textarea" [(ngModel)]="f.messages.handoffSupport" (ngModelChange)="touch()" placeholder="Entiendo, lamento el inconveniente 🙏. Una asesora de servicio al cliente te escribe…"></textarea></div>
+              <div class="field"><label>Traspaso por comprobante de pago</label><textarea class="textarea" [(ngModel)]="f.messages.handoffPayment" (ngModelChange)="touch()" placeholder="¡Gracias! 🙌 Una asesora verifica tu pago y te confirma el despacho."></textarea></div>
+              <div class="field"><label>Traspaso cuando pide una persona</label><textarea class="textarea" [(ngModel)]="f.messages.handoffHuman" (ngModelChange)="touch()" placeholder="Claro 😊, ya le aviso a una asesora para que te escriba."></textarea></div>
+            </div>
+            <div class="grid-3">
+              <div class="field"><label>Opciones por carrusel</label><input class="input" type="number" min="1" max="10" [(ngModel)]="f.maxOptions" (ngModelChange)="touch()" /></div>
+              <div class="field"><label>Intentos antes de pasar al asesor</label><input class="input" type="number" min="1" [(ngModel)]="f.maxRetries" (ngModelChange)="touch()" /></div>
+              <div class="field"><label>Versión</label><input class="input" [value]="f.version" disabled /></div>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  }
+</div>
