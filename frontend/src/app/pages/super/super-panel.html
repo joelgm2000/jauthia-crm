@@ -1,5 +1,5 @@
 <header class="topbar">
-  <div class="logo">J</div>
+  <img class="logo" src="brand/isotipo.webp" alt="JAUTHIA" />
   <div><b>JAUTHIA</b><small>Panel de la plataforma</small></div>
   <span class="spacer"></span>
   <span class="who"><b>{{ auth.user()?.name }}</b><small>{{ auth.isOwner() ? 'Dueño de la plataforma' : 'Super administrador' }}</small></span>
@@ -38,7 +38,7 @@
   </div>
 
   <div class="card table-wrap">
-    <table class="table">
+    <table class="table tenants">
       <thead>
         <tr><th>Cliente</th><th>Contacto</th><th>Contrató</th><th>Plan</th><th>Estado</th><th>Próximo cobro / fin de prueba</th><th>Uso</th><th></th></tr>
       </thead>
@@ -46,19 +46,19 @@
         @for (t of filtered(); track t.id) {
           <tr>
             <td><b>{{ t.name }}</b><small class="block">{{ t.city || '—' }} · <code>{{ t.id }}</code></small></td>
-            <td>{{ t.contactName || '—' }}<small class="block">{{ t.contactEmail }} {{ t.contactPhone }}</small></td>
-            <td><span class="chip" [class.on]="t.modules.crm && t.modules.chatbot">{{ modulesLabel(t) }}</span></td>
-            <td>{{ t.plan.name }}<small class="block">{{ t.plan.price | cop }}/mes · día {{ t.plan.billingDay }}</small></td>
-            <td><span class="badge" [class.ok]="t.status === 'activo'" [class.warn]="t.status === 'prueba'" [class.high]="t.status === 'suspendido'">{{ t.status }}</span></td>
-            <td>
+            <td data-label="Contacto">{{ t.contactName || '—' }}<small class="block">{{ t.contactEmail }} {{ t.contactPhone }}</small></td>
+            <td data-label="Contrató"><span class="chip" [class.on]="t.modules.crm && t.modules.chatbot">{{ modulesLabel(t) }}</span></td>
+            <td data-label="Plan">{{ t.plan.name }}<small class="block">{{ t.plan.price | cop }}/mes · día {{ t.plan.billingDay }}</small></td>
+            <td data-label="Estado"><span class="badge" [class.ok]="t.status === 'activo'" [class.warn]="t.status === 'prueba'" [class.high]="t.status === 'suspendido'">{{ t.status }}</span></td>
+            <td data-label="Próximo cobro">
               @let d = t.status === 'prueba' ? t.trialEndsAt : t.nextDueAt;
               @if (d) { {{ toDate(d) }} @if (dueState(t) === 'vencido') { <span class="badge high">vencido</span> } @else if (dueState(t) === 'pronto') { <span class="badge warn">pronto</span> } } @else { — }
             </td>
-            <td><small class="block">{{ t.users }} usuario(s) · {{ t.conversations }} chats</small><small class="block">{{ t.lastActivityAt ? ('activo hace ' + (t.lastActivityAt | ago)) : 'sin actividad' }}</small></td>
+            <td data-label="Uso"><small class="block">{{ t.users }} usuario(s) · {{ t.conversations }} chats</small><small class="block">{{ t.lastActivityAt ? ('activo hace ' + (t.lastActivityAt | ago)) : 'sin actividad' }}</small></td>
             <td class="actions">
               <button class="btn sm primary" (click)="manage(t)" title="Entrar a configurar flujo, catálogo, WhatsApp…"><app-icon name="external" [size]="13" /> Gestionar</button>
-              <button class="btn sm" (click)="openUsers(t)"><app-icon name="users" [size]="13" /></button>
-              <button class="btn sm" (click)="edit(t)"><app-icon name="edit" [size]="13" /></button>
+              <button class="btn sm" (click)="openUsers(t)" title="Usuarios del cliente" aria-label="Usuarios del cliente"><app-icon name="users" [size]="13" /></button>
+              <button class="btn sm edit" (click)="edit(t)" title="Editar cliente" aria-label="Editar cliente"><app-icon name="edit" [size]="13" /></button>
             </td>
           </tr>
         } @empty {
@@ -115,8 +115,21 @@
         <div class="modules">
           <label class="mod" [class.on]="t.modules.crm"><input type="checkbox" [(ngModel)]="t.modules.crm" /> <b>CRM</b><small>Bandeja omnicanal, embudo, contactos, tareas y resumen.</small></label>
           <label class="mod" [class.on]="t.modules.chatbot"><input type="checkbox" [(ngModel)]="t.modules.chatbot" /> <b>Chatbot</b><small>Bot con flujo personalizado, catálogo, carruseles y plantillas.</small></label>
-          <label class="mod" [class.on]="t.modules.aiImages"><input type="checkbox" [(ngModel)]="t.modules.aiImages" /> <b>IA de imágenes</b><small>Genera fotos del producto (estudio, ambiente, publicidad) con la IA de JAUTHIA. Consume créditos de la plataforma.</small></label>
+          <label class="mod" [class.on]="t.modules.aiImages"><input type="checkbox" [(ngModel)]="t.modules.aiImages" /> <b>IA de imágenes</b><small>Genera fotos del producto (estudio, ambiente, publicidad) con IA. Usa la clave API del cliente o, si no tiene, la de la plataforma.</small></label>
         </div>
+        @if (t.modules.aiImages) {
+          <div class="field ai-key">
+            <label>Clave API de la IA de imágenes (Google Gemini)</label>
+            <input class="input" type="password" name="ai-api-key" autocomplete="new-password" spellcheck="false" autocapitalize="off"
+              [placeholder]="aiKeySaved() && !aiKeyRemove ? '••••••••••••  (guardada)' : 'Pega aquí la clave de este cliente'"
+              [(ngModel)]="aiKey" (copy)="$event.preventDefault()" (cut)="$event.preventDefault()" />
+            <small class="muted">
+              @if (aiKeyRemove) { Se quitará al guardar: usará la clave de la plataforma (si hay). <a href="" (click)="$event.preventDefault(); aiKeyRemove = false">Deshacer</a> }
+              @else if (aiKeySaved()) { ✓ Guardada y cifrada. No se puede ver: escribe una nueva para reemplazarla. <a href="" (click)="$event.preventDefault(); aiKeyRemove = true; aiKey = ''">Quitar clave</a> }
+              @else { Se guarda cifrada y nadie podrá verla después. Si la dejas vacía, usa la clave de la plataforma. }
+            </small>
+          </div>
+        }
 
         <h3>Plan mensual</h3>
         <div class="grid-3">

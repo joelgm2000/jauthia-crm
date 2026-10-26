@@ -111,3 +111,20 @@
   .back { display: inline-flex; }
   .list-head { padding-top: 56px; }
 }
+/* Celular: el botón de menú (fijo arriba a la izquierda) no tapa el de volver; los controles bajan a una 2.ª fila */
+@media (max-width: 900px) {
+  .chat-head { padding-left: 58px; }
+}
+@media (max-width: 640px) {
+  .chat-head { flex-wrap: wrap; row-gap: 8px; }
+  .chat-head .spacer { display: none; }
+  .chat-head .who { flex: 1 1 calc(100% - 190px); }
+  .chat-head .who b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-head .who small { overflow: hidden; text-overflow: ellipsis; }
+  .chat-head > button:last-child { order: 1; }
+  .stage-select { order: 2; flex: 1 1 55%; min-width: 0; max-width: none; }
+  .chat-head .btn.sm:not(.icon-only) { order: 3; }
+  .banner { flex-wrap: wrap; }
+  .banner > div { flex: 1 1 calc(100% - 50px); }
+  .banner .spacer { display: none; }
+}

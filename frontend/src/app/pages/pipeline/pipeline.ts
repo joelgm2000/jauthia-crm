@@ -101,8 +101,8 @@ interface Column {
   `,
   styles: `
     .page.wide { max-width: none; height: 100vh; display: flex; flex-direction: column; }
-    .kpis { display: flex; gap: 10px; }
-    .kpis > div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; display: flex; flex-direction: column; min-width: 120px; }
+    .kpis { display: flex; flex-wrap: wrap; gap: 10px; }
+    .kpis > div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; display: flex; flex-direction: column; min-width: 104px; flex: 1 1 auto; }
     .kpis b { font-size: 18px; }
     .kpis .hot { border-color: #ffc4b4; background: #fff4f0; }
     :root[data-theme='dark'] .kpis .hot { background: #2a1510; border-color: #5a2a1c; }

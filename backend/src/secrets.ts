@@ -1,5 +1,6 @@
 /**
- * Tokens de las redes de cada cliente (WhatsApp, Messenger/Instagram, Telegram).
+ * Tokens de las redes de cada cliente (WhatsApp, Messenger/Instagram, Telegram) y su clave propia
+ * de la IA de imágenes (la pone el super administrador al gestionar el cliente).
  *
  *  - Se guardan CIFRADOS en la tabla channel_secrets con AES-256-GCM (clave SECRETS_KEY del servidor).
  *  - Nunca se devuelven al navegador: la pantalla solo ve "guardado ••••1234".
@@ -20,6 +21,9 @@ export const SECRET_FIELDS: Partial<Record<ChannelType, string[]>> = {
 
 export type ChannelSecrets = Record<string, string>;
 
+/** Fila de channel_secrets: un canal, o 'ai' para la clave de la IA de imágenes del cliente. */
+type SecretScope = ChannelType | 'ai';
+
 function encrypt(plain: string): string {
   const iv = randomBytes(12);
   const c = createCipheriv('aes-256-gcm', config.secretsKey, iv);
@@ -35,7 +39,7 @@ function decrypt(blob: string): string {
   return Buffer.concat([d.update(Buffer.from(data, 'base64')), d.final()]).toString('utf8');
 }
 
-export async function getSecrets(tenantId: string, channel: ChannelType): Promise<ChannelSecrets> {
+export async function getSecrets(tenantId: string, channel: SecretScope): Promise<ChannelSecrets> {
   const r = await pool.query('SELECT data_enc FROM channel_secrets WHERE tenant_id = $1 AND channel = $2', [tenantId, channel]);
   if (!r.rows[0]) return {};
   try {
@@ -48,7 +52,10 @@ export async function getSecrets(tenantId: string, channel: ChannelType): Promis
 
 /** Guarda solo los campos enviados; un campo vacío ("") lo borra. */
 export async function saveSecrets(tenantId: string, channel: ChannelType, patch: ChannelSecrets): Promise<void> {
-  const allowed = SECRET_FIELDS[channel] ?? [];
+  await writeSecrets(tenantId, channel, SECRET_FIELDS[channel] ?? [], patch);
+}
+
+async function writeSecrets(tenantId: string, channel: SecretScope, allowed: string[], patch: ChannelSecrets): Promise<void> {
   const cur = await getSecrets(tenantId, channel);
   for (const [k, v] of Object.entries(patch)) {
     if (!allowed.includes(k)) continue;
@@ -60,6 +67,16 @@ export async function saveSecrets(tenantId: string, channel: ChannelType, patch:
      ON CONFLICT (tenant_id, channel) DO UPDATE SET data_enc = EXCLUDED.data_enc, updated_at = EXCLUDED.updated_at`,
     [tenantId, channel, encrypt(JSON.stringify(cur)), Date.now()],
   );
+}
+
+/** Clave de Gemini propia del cliente ('' si no tiene: se usa la de la plataforma). Nunca sale hacia el navegador. */
+export async function getAiKey(tenantId: string): Promise<string> {
+  return (await getSecrets(tenantId, 'ai'))['geminiApiKey'] ?? '';
+}
+
+/** Guarda la clave de IA del cliente; "" la quita. */
+export async function setAiKey(tenantId: string, key: string): Promise<void> {
+  await writeSecrets(tenantId, 'ai', ['geminiApiKey'], { geminiApiKey: key });
 }
 
 /** Lo que ve el navegador: qué campos están guardados y sus últimos 4 caracteres. */

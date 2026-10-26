@@ -24,7 +24,7 @@ interface NavItem {
   template: `
     <aside class="side" [class.open]="menuOpen()">
       <div class="brand">
-        <div class="logo">J</div>
+        <img class="logo" src="brand/isotipo.webp" alt="JAUTHIA" />
         <div>
           <b>JAUTHIA CRM</b>
           <small>{{ auth.tenant()?.name || store.settings().companyName }}</small>
@@ -48,7 +48,7 @@ interface NavItem {
           <div class="mode live" [class.off]="!store.online()"><span class="dot"></span> {{ store.online() ? 'Conectado al servidor' : 'Reconectando…' }}</div>
         }
         <div class="me">
-          <span class="avatar" style="width:32px;height:32px;background:#ff6b1a;font-size:12px">{{ auth.user()?.name | initials }}</span>
+          <span class="avatar" style="width:32px;height:32px;background:#1a9dd9;font-size:12px">{{ auth.user()?.name | initials }}</span>
           <div class="who"><b>{{ auth.user()?.name }}</b><small>{{ auth.user()?.email }}</small></div>
           <button class="btn ghost sm icon-only" (click)="toggleTheme()" [title]="dark() ? 'Modo claro' : 'Modo oscuro'"><app-icon [name]="dark() ? 'sun' : 'moon'" [size]="16" /></button>
           @if (!auth.isDemo) {
@@ -82,13 +82,13 @@ interface NavItem {
     :host { display: flex; height: 100vh; overflow: hidden; }
     .side { width: 232px; flex: none; background: var(--side); color: var(--side-text); display: flex; flex-direction: column; padding: 14px 10px; }
     .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
-    .brand b { color: #fff; display: block; font-size: 14px; letter-spacing: .02em; }
+    .brand b { color: #fff; display: block; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 15px; letter-spacing: .08em; }
     .brand small { color: var(--side-text); font-size: 12px; }
-    .logo { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 18px; background: linear-gradient(135deg, #ff6b1a, #ff3d6e); box-shadow: 0 4px 14px rgba(255, 107, 26, .35); }
+    .logo { width: 38px; height: 38px; object-fit: contain; flex: none; filter: drop-shadow(0 4px 10px rgba(26, 157, 217, .35)); }
     nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
     nav a { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 9px; color: var(--side-text); font-weight: 500; transition: background .15s, color .15s; }
     nav a:hover { background: rgba(255,255,255,.06); color: #fff; }
-    nav a.active { background: rgba(255, 107, 26, .14); color: #fff; }
+    nav a.active { background: rgba(26, 157, 217, .14); color: #fff; }
     nav a.active app-icon { color: var(--brand); }
     nav a span { flex: 1; }
     nav em { font-style: normal; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.12); color: #fff; border-radius: 10px; padding: 1px 7px; }

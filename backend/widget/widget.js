@@ -1,7 +1,7 @@
 /*!
  * Widget de chat web · JAUTHIA CRM
  * Pega esto antes de </body> en el sitio del cliente:
- *   <script src="https://TU-DOMINIO/widget.js?t=ID-DEL-CLIENTE" data-title="EvoSport" data-color="#ff6b1a" async></script>
+ *   <script src="https://TU-DOMINIO/widget.js?t=ID-DEL-CLIENTE" data-title="EvoSport" data-color="#1a9dd9" async></script>
  * Los mensajes llegan a la bandeja del CRM como canal "Chat web" y los responde el mismo bot.
  */
 (function () {
@@ -16,7 +16,7 @@
   if (!/^[a-z0-9-]{3,60}$/.test(TENANT)) { console.warn('[chat] Falta el id del cliente (?t=)'); return; }
   var API = BASE + '/webhooks/' + TENANT + '/webchat';
   var TITLE = script.getAttribute('data-title') || 'Chat';
-  var COLOR = script.getAttribute('data-color') || '#ff6b1a';
+  var COLOR = script.getAttribute('data-color') || '#1a9dd9';
   var SUBTITLE = script.getAttribute('data-subtitle') || 'Te respondemos en minutos';
   var KEY = 'jauthia_chat_sid_' + TENANT;
 

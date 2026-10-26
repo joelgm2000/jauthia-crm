@@ -39,6 +39,9 @@ export class SuperPanel implements OnInit {
 
   // Modal de cliente
   readonly editing = signal<Tenant | null>(null);
+  readonly aiKeySaved = signal(false);
+  aiKey = '';
+  aiKeyRemove = false;
   readonly isNew = signal(false);
   flowTemplate: 'evosport' | 'generico' = 'generico';
   sampleCatalog = false;
@@ -117,6 +120,7 @@ export class SuperPanel implements OnInit {
   // ---- Cliente ----
   create(): void {
     this.isNew.set(true);
+    this.resetAiKey(false);
     this.flowTemplate = 'generico';
     this.sampleCatalog = false;
     this.adminName = this.adminEmail = this.adminPassword = '';
@@ -124,8 +128,9 @@ export class SuperPanel implements OnInit {
   }
 
   edit(t: TenantSummary): void {
-    const { users: _u, conversations: _c, lastActivityAt: _l, ...tenant } = t;
+    const { users: _u, conversations: _c, lastActivityAt: _l, aiKeySaved, ...tenant } = t;
     this.isNew.set(false);
+    this.resetAiKey(aiKeySaved);
     this.confirmDelete = '';
     this.editing.set(structuredClone(tenant));
   }
@@ -144,7 +149,11 @@ export class SuperPanel implements OnInit {
     }
     const payload: Tenant = { ...t, plan: { ...t.plan, price: Number(t.plan.price) || 0, billingDay: Number(t.plan.billingDay) || 1 } };
     if (isNew) delete (payload as Partial<Tenant>).id;
-    const { tenant } = await this.store.superCall('saveTenant', { tenant: payload, ...(isNew ? { flowTemplate: this.flowTemplate, sampleCatalog: this.sampleCatalog } : {}) });
+    const aiApiKey = this.aiKeyRemove ? '' : this.aiKey.trim() || undefined;
+    const { tenant } = await this.store.superCall('saveTenant', {
+      tenant: payload, ...(isNew ? { flowTemplate: this.flowTemplate, sampleCatalog: this.sampleCatalog } : {}), ...(aiApiKey !== undefined ? { aiApiKey } : {}),
+    });
+    this.resetAiKey(false);
     if (isNew && this.adminEmail) {
       await this.store.superCall('createTenantUser', { tenantId: tenant.id, name: this.adminName || 'Administrador', email: this.adminEmail, password: this.adminPassword, role: 'admin' });
     }
@@ -152,6 +161,13 @@ export class SuperPanel implements OnInit {
     this.editing.set(null);
     this.store.toast(isNew ? `Cliente ${tenant.name} creado` : 'Cliente actualizado', 'success');
     await this.load();
+  }
+
+  /** La clave escrita solo vive en el formulario hasta guardar; nunca se lee del servidor. */
+  private resetAiKey(saved: boolean): void {
+    this.aiKey = '';
+    this.aiKeyRemove = false;
+    this.aiKeySaved.set(saved);
   }
 
   async remove(): Promise<void> {

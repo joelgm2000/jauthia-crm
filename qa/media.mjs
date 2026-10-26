@@ -1,5 +1,5 @@
 // Fotos, videos e IA de imágenes del catálogo, sobre una instancia de QA recién reiniciada (sh restart.sh).
-// Para probar la llamada a la IA sin gastar: arrancar con GEMINI_API_KEY=clave-falsa (Google la rechaza → 502).
+// La IA se prueba con una clave falsa guardada en el cliente (Google la rechaza → 502): no gasta créditos.
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
@@ -96,24 +96,51 @@ check('No se puede listar la carpeta de un cliente', r.status === 404, r.status)
 console.log('\nIA de imágenes');
 r = await generate('evo', { imageUrl: jpgUrl, style: 'estudio' });
 check('Sin el módulo de IA, el cliente no puede generar', r.status === 403, `${r.status} ${r.json?.error}`);
-await sup('saveTenant', { tenant: { ...evo, modules: { ...evo.modules, aiImages: true } } });
+const evoAi = { ...evo, modules: { ...evo.modules, aiImages: true } };
+await sup('saveTenant', { tenant: evoAi });
 await sup('saveTenant', { tenant: { ...pan, modules: { ...pan.modules, aiImages: true } } });
+const first = await generate('evo', { imageUrl: jpgUrl, style: 'estudio' });
+const platformKey = first.status !== 503;
+if (!platformKey) check('Sin clave del cliente ni de la plataforma responde "no configurada"', /clave API/.test(first.json?.error ?? ''), first.json?.error);
+
+console.log('\nClave de IA propia del cliente');
+const FAKE_KEY = 'AIzaQA' + randomBytes(30).toString('base64url').slice(0, 33);
+const row = (res, id) => res.json.result.tenants.find((t) => t.id === id);
+r = await sup('saveTenant', { tenant: evoAi, aiApiKey: 'no es una clave' });
+check('Rechaza una clave con formato inválido', r.status === 400, r.status);
+r = await sup('saveTenant', { tenant: evoAi, aiApiKey: FAKE_KEY });
+check('El super admin guarda la clave del cliente', r.status === 200 && !JSON.stringify(r.json).includes(FAKE_KEY), r.status);
+r = await sup('listTenants', {});
+check('El panel solo sabe que está guardada', row(r, evo.id)?.aiKeySaved === true && row(r, pan.id)?.aiKeySaved === false, `${row(r, evo.id)?.aiKeySaved} ${row(r, pan.id)?.aiKeySaved}`);
+check('La clave nunca vuelve al navegador (ni sus últimos dígitos)', !JSON.stringify(r.json).includes(FAKE_KEY.slice(-6)), 'filtrada');
+const bootJson = JSON.stringify((await call('/api/bootstrap', { jar: 'evo' })).json);
+check('El administrador del cliente tampoco la ve', !bootJson.includes(FAKE_KEY.slice(-6)), 'filtrada');
+r = await act('evo', 'saveChannelSecrets', { channel: 'ai', secrets: { geminiApiKey: 'x'.repeat(30) } });
+check('Un cliente no puede cambiar su clave de IA por su cuenta', r.status === 400, r.status);
+await sup('saveTenant', { tenant: evoAi });
+r = await sup('listTenants', {});
+check('Guardar el cliente sin tocar el campo conserva la clave', row(r, evo.id)?.aiKeySaved === true, row(r, evo.id)?.aiKeySaved);
+
 r = await generate('ase', { imageUrl: jpgUrl, style: 'estudio' });
 check('Un asesor no puede generar con IA', r.status === 403, r.status);
 r = await generate('evo', { imageUrl: jpgUrl, style: 'inventado' });
-const keyed = r.status !== 503;
-if (keyed) {
-  check('Rechaza un estilo que no existe', r.status === 400, r.status);
+check('Rechaza un estilo que no existe', r.status === 400, r.status);
+r = await generate('evo', { imageUrl: '/media/' + evo.id + '/../../backend/.env', style: 'estudio' });
+check('La IA no lee archivos fuera del catálogo', r.status === 400, r.status);
+r = await generate('evo', { imageUrl: mp4Url, style: 'estudio' });
+check('La IA solo parte de fotos (no de videos)', r.status === 400, r.status);
+r = await generate('evo', { imageUrl: jpgUrl, style: 'ambiente', extra: 'en un gimnasio' });
+check('Con la clave del cliente llega hasta Google (clave falsa → error controlado)', r.status === 502 && !/key|AIza/i.test(r.json?.error ?? ''), `${r.status} ${r.json?.error}`);
+if (platformKey) {
   r = await generate('pan', { imageUrl: jpgUrl, style: 'estudio' });
   check('Otro cliente no puede usar las fotos de EvoSport', r.status === 400, `${r.status} ${r.json?.error}`);
-  r = await generate('evo', { imageUrl: '/media/' + evo.id + '/../../backend/.env', style: 'estudio' });
-  check('La IA no lee archivos fuera del catálogo', r.status === 400, r.status);
-  r = await generate('evo', { imageUrl: mp4Url, style: 'estudio' });
-  check('La IA solo parte de fotos (no de videos)', r.status === 400, r.status);
-  r = await generate('evo', { imageUrl: jpgUrl, style: 'ambiente', extra: 'en un gimnasio' });
-  check('Con el módulo activo llega hasta Google (clave falsa → error controlado)', r.status === 502 && !/key|AIza/i.test(r.json?.error ?? ''), `${r.status} ${r.json?.error}`);
-} else {
-  check('Sin clave de IA en el servidor responde "no configurada"', r.status === 503, r.status);
+}
+await sup('saveTenant', { tenant: evoAi, aiApiKey: '' });
+r = await sup('listTenants', {});
+check('El super admin puede quitar la clave', row(r, evo.id)?.aiKeySaved === false, row(r, evo.id)?.aiKeySaved);
+if (!platformKey) {
+  r = await generate('evo', { imageUrl: jpgUrl, style: 'estudio' });
+  check('Sin clave vuelve a responder "no configurada"', r.status === 503, r.status);
 }
 
 // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ import { invalidateCtx, publishTeam } from './core';
 import { pool } from './db';
 import { log } from './log';
 import { emailSchema, passwordSchema, short, tenantRole } from './schemas';
+import { getAiKey, setAiKey } from './secrets';
 import { seedTenant } from './tenants';
 
 const tenantId = z.string().min(3).max(60).regex(/^[a-z0-9-]+$/, 'Solo minúsculas, números y guiones');
@@ -40,7 +41,10 @@ const tenant = z.object({
 
 const schemas: Record<SuperAction, z.ZodType> = {
   listTenants: z.object({}),
-  saveTenant: z.object({ tenant, flowTemplate: z.enum(['evosport', 'generico']).optional(), sampleCatalog: z.boolean().optional() }),
+  saveTenant: z.object({
+    tenant, flowTemplate: z.enum(['evosport', 'generico']).optional(), sampleCatalog: z.boolean().optional(),
+    aiApiKey: z.union([z.literal(''), z.string().trim().regex(/^[\w-]{20,200}$/, 'La clave API no tiene un formato válido')]).optional(),
+  }),
   deleteTenant: z.object({ id: tenantId, confirmName: short(120) }),
   listTenantUsers: z.object({ tenantId }),
   createTenantUser: z.object({ tenantId, name: short(80).min(2), email: emailSchema, password: passwordSchema, role: tenantRole }),
@@ -67,9 +71,13 @@ const handlers: { [A in SuperAction]: Handler<A> } = {
       SELECT t.data,
              (SELECT count(*)::int FROM users u WHERE u.tenant_id = t.id) AS users,
              (SELECT count(*)::int FROM conversations c WHERE c.tenant_id = t.id) AS conversations,
-             (SELECT max(m.created_at) FROM messages m WHERE m.tenant_id = t.id) AS last
+             (SELECT max(m.created_at) FROM messages m WHERE m.tenant_id = t.id) AS last,
+             EXISTS (SELECT 1 FROM channel_secrets s WHERE s.tenant_id = t.id AND s.channel = 'ai') AS ai_row
       FROM tenants t ORDER BY t.created_at`);
-    const tenants: TenantSummary[] = r.rows.map((x) => ({ ...x.data, users: x.users, conversations: x.conversations, lastActivityAt: x.last ?? null }));
+    const tenants: TenantSummary[] = await Promise.all(r.rows.map(async (x) => ({
+      ...x.data, users: x.users, conversations: x.conversations, lastActivityAt: x.last ?? null,
+      aiKeySaved: x.ai_row && !!(await getAiKey(x.data.id)),
+    })));
     return { tenants };
   },
 
@@ -79,6 +87,10 @@ const handlers: { [A in SuperAction]: Handler<A> } = {
     const t: Tenant = { ...d.tenant, id: exists?.id ?? newTenantId(d.tenant.name), createdAt: exists?.createdAt ?? now };
     await pool.query(`INSERT INTO tenants (id, data, created_at) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data`, [t.id, JSON.parse(JSON.stringify(t)), t.createdAt]);
     if (!exists) await seedTenant(t, d.flowTemplate ?? 'generico', !!d.sampleCatalog);
+    if (d.aiApiKey !== undefined) {
+      await setAiKey(t.id, d.aiApiKey);
+      log.info(d.aiApiKey ? 'Clave de IA del cliente guardada' : 'Clave de IA del cliente quitada', { tenant: t.id });
+    }
     invalidateCtx(t.id);
     // Al suspender, las sesiones de ese cliente dejan de valer de inmediato.
     if (exists && exists.status !== 'suspendido' && t.status === 'suspendido') {

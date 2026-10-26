@@ -103,6 +103,8 @@ export const MODULE_ACTIONS: Partial<Record<ApiAction, keyof TenantModules>> = {
 // ---------------------------------------------------------------------------
 
 export interface TenantSummary extends Tenant {
+  /** Tiene clave propia de IA de imágenes (la clave nunca viaja al navegador). */
+  aiKeySaved: boolean;
   users: number;
   conversations: number;
   lastActivityAt: number | null;
@@ -110,7 +112,8 @@ export interface TenantSummary extends Tenant {
 
 export interface SuperActions {
   listTenants: { req: Record<string, never>; res: { tenants: TenantSummary[] } };
-  saveTenant: { req: { tenant: Tenant; flowTemplate?: 'evosport' | 'generico'; sampleCatalog?: boolean }; res: { tenant: Tenant } };
+  /** aiApiKey: clave de la IA de imágenes del cliente; se guarda cifrada y no se devuelve. "" la quita, ausente la deja igual. */
+  saveTenant: { req: { tenant: Tenant; flowTemplate?: 'evosport' | 'generico'; sampleCatalog?: boolean; aiApiKey?: string }; res: { tenant: Tenant } };
   deleteTenant: { req: { id: string; confirmName: string }; res: void };
   listTenantUsers: { req: { tenantId: string }; res: { users: CrmUserInfo[] } };
   createTenantUser: { req: { tenantId: string; name: string; email: string; password: string; role: TenantRole }; res: { user: CrmUserInfo } };

@@ -1,21 +1,24 @@
 /* ==========================================================================
    JAUTHIA CRM · estilos globales
    ========================================================================== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800&display=swap');
 
 :root {
-  --brand: #ff6b1a;
-  --brand-2: #ff8f4d;
-  --brand-soft: #fff1e8;
-  --bg: #f4f5f7;
+  /* Manual de marca JAUTHIA: Solidez #141d29 · Innovación #1a9dd9 · Claridad #74cbf1 · fondo web #09101c */
+  --brand: #1a9dd9;
+  --brand-2: #74cbf1;
+  --brand-soft: #e7f5fc;
+  --brand-dark: #141d29;
+  --brand-gradient: linear-gradient(135deg, #1a9dd9, #74cbf1);
+  --bg: #f3f6f9;
   --panel: #ffffff;
   --panel-2: #f9fafb;
   --text: #111827;
   --muted: #6b7280;
   --line: #e5e7eb;
   --hover: #f3f4f6;
-  --side: #0f1115;
-  --side-text: #a1a7b3;
+  --side: #141d29;
+  --side-text: #a9b6c6;
   --ok: #10b981;
   --warn: #f59e0b;
   --danger: #ef4444;
@@ -35,15 +38,15 @@
 }
 
 :root[data-theme='dark'] {
-  --brand-soft: #3a2214;
-  --bg: #0b0d10;
-  --panel: #15181d;
-  --panel-2: #1b1f25;
+  --brand-soft: #0f2c3d;
+  --bg: #09101c;
+  --panel: #111a28;
+  --panel-2: #16202f;
   --text: #e8eaed;
   --muted: #9aa1ac;
-  --line: #262b33;
-  --hover: #1f242b;
-  --side: #08090b;
+  --line: #22304a;
+  --hover: #1a2537;
+  --side: #070c16;
   --chat-bg: #0e1418;
   --bubble-in: #202c33;
   --bubble-out: #005c4b;
@@ -64,7 +67,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--brand); text-decoration: none; }
-h1, h2, h3, h4 { margin: 0; letter-spacing: -.01em; }
+h1, h2, h3, h4 { margin: 0; letter-spacing: -.01em; font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
 h1 { font-size: 22px; font-weight: 800; }
 h2 { font-size: 16px; font-weight: 700; }
 h3 { font-size: 14px; font-weight: 700; }
@@ -104,7 +107,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: var(--panel); outline: none; transition: border-color .15s, box-shadow .15s;
 }
 .textarea { height: auto; min-height: 80px; padding: 9px 11px; resize: vertical; line-height: 1.45; }
-.input:focus, .select:focus, .textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(255, 107, 26, .15); }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(26, 157, 217, .15); }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 720px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
@@ -127,7 +130,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: var(--hover); color: var(--text); font-size: 12px; font-weight: 600; border: 1px solid transparent; white-space: nowrap;
 }
 button.chip { cursor: pointer; }
-.chip.on { background: var(--brand-soft); color: var(--brand); border-color: rgba(255, 107, 26, .35); }
+.chip.on { background: var(--brand-soft); color: var(--brand); border-color: rgba(26, 157, 217, .35); }
 .chip .x { cursor: pointer; opacity: .6; }
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
 .badge.hot { background: #ffe4dc; color: #c2280c; }
@@ -186,3 +189,25 @@ button.chip { cursor: pointer; }
 .toast.intent { border-left: 4px solid var(--info); }
 .toast.success { border-left: 4px solid var(--ok); }
 .toast.error { border-left: 4px solid var(--danger); }
+
+/* --------------------------------------------------------------------------
+   Celular: el botón de menú está fijo arriba a la izquierda, así que el contenido
+   arranca debajo; márgenes más cortos, modales a pantalla casi completa y
+   campos de 16px (evita que el iPhone haga zoom al escribir).
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .page { padding: 18px 14px 24px; }
+  app-shell .page { padding-top: 62px; }
+  .page.wide { height: 100dvh; }
+}
+@media (max-width: 640px) {
+  h1 { font-size: 20px; }
+  .page-head { gap: 8px; margin-bottom: 14px; }
+  .page-head > div:first-child { flex: 1 1 100%; }
+  .page-head > .spacer { display: none; }
+  .overlay { padding: 12px 8px; }
+  .modal-head, .modal-body, .modal-foot { padding-left: 14px; padding-right: 14px; }
+  .modal-foot { flex-wrap: wrap; }
+  .input, .select, .textarea { font-size: 16px; }
+  .toasts { left: 12px; right: 12px; bottom: 12px; }
+}

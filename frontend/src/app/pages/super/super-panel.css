@@ -2,7 +2,7 @@
 .topbar small { display: block; color: var(--side-text); font-size: 12px; }
 .topbar .who { text-align: right; }
 .topbar .btn { color: var(--side-text); }
-.logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; background: linear-gradient(135deg, #ff6b1a, #ff3d6e); }
+.logo { width: 36px; height: 36px; object-fit: contain; flex: none; }
 .filters { margin-bottom: 12px; }
 .block { display: block; }
 code { font-size: 11px; background: var(--hover); padding: 1px 5px; border-radius: 4px; }
@@ -20,3 +20,17 @@ code { font-size: 11px; background: var(--hover); padding: 1px 5px; border-radiu
 .danger-zone { border: 1px solid #fecaca; background: #fef2f2; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; color: #7f1d1d; }
 :root[data-theme='dark'] .danger-zone { background: #2a1111; border-color: #5a1f1f; color: #fca5a5; }
 @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .modules { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .topbar { padding: 10px 14px; } .topbar .who { display: none; } }
+/* Celular: cada cliente es una tarjeta en vez de una fila de tabla */
+@media (max-width: 720px) {
+  .tenants thead { display: none; }
+  .tenants, .tenants tbody, .tenants tr, .tenants td { display: block; width: 100%; }
+  .tenants tr { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .tenants td { border: 0; padding: 4px 0; }
+  .tenants td[data-label] { display: flex; gap: 10px; align-items: baseline; }
+  .tenants td[data-label]::before { content: attr(data-label); flex: 0 0 96px; font-size: 12px; color: var(--muted); }
+  .tenants td.actions { display: flex; gap: 6px; padding-top: 10px; white-space: normal; }
+  .tenants td.actions .btn { margin: 0; }
+  .tenants td.actions .btn.primary { flex: 1; justify-content: center; }
+  .tenants tr:hover td { background: none; }
+}

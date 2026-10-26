@@ -167,7 +167,7 @@ export class Channels {
 
   widgetSnippet(): string {
     const name = this.store.settings().companyName || 'Chat';
-    return `<script src="${this.store.publicBaseUrl() || window.location.origin}/widget.js?t=${this.auth.tenant()?.id}" data-title="${name}" data-color="#ff6b1a" async></script>`;
+    return `<script src="${this.store.publicBaseUrl() || window.location.origin}/widget.js?t=${this.auth.tenant()?.id}" data-title="${name}" data-color="#1a9dd9" async></script>`;
   }
 
   copy(text: string): void {

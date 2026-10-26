@@ -48,7 +48,7 @@ import { CopPipe } from '../../ui/pipes';
     .p { position: relative; display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 0 0 10px; border: 2px solid var(--line); border-radius: 12px; background: var(--panel); cursor: pointer; overflow: hidden; color: var(--text); }
     .p img { width: 100%; aspect-ratio: 4/3; object-fit: cover; margin-bottom: 6px; }
     .p b, .p small { padding: 0 10px; }
-    .p.sel { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(255,107,26,.15); }
+    .p.sel { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(26, 157, 217,.15); }
     .check { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.35); color: transparent; display: grid; place-items: center; }
     .p.sel .check { background: var(--brand); color: #fff; }
   `,

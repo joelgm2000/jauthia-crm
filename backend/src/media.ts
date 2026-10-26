@@ -6,7 +6,8 @@
  *   GET  /media/<cliente>/<archivo>   público: WhatsApp, Messenger y Telegram descargan desde aquí
  *
  * Seguridad: solo administradores; el tipo se comprueba por el contenido (no por el nombre); nombres al
- * azar en la carpeta del cliente; cupo de espacio por cliente; la IA solo parte de archivos del mismo cliente.
+ * azar en la carpeta del cliente; cupo de espacio por cliente; la IA solo parte de archivos del mismo cliente
+ * y usa la clave del cliente (cifrada en channel_secrets) o, si no tiene, GEMINI_API_KEY de la plataforma.
  */
 import { randomBytes } from 'node:crypto';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
@@ -20,6 +21,7 @@ import { ApiError } from './auth';
 import { config } from './config';
 import { errorMessage, fetchJson } from './http';
 import { log } from './log';
+import { getAiKey } from './secrets';
 
 const MB = 1024 * 1024;
 
@@ -94,8 +96,8 @@ const generateSchema = z.object({
 interface GeminiPart { text?: string; inlineData?: { mimeType?: string; data?: string } }
 interface GeminiResponse { candidates?: { content?: { parts?: GeminiPart[] } }[] }
 
-async function generateImage(source: { data: Buffer; mime: string }, prompt: string): Promise<Buffer> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.aiImageModel)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
+async function generateImage(apiKey: string, source: { data: Buffer; mime: string }, prompt: string): Promise<Buffer> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.aiImageModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const r = await fetchJson<GeminiResponse>(url, {
     body: {
       contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: source.mime, data: source.data.toString('base64') } }] }],
@@ -142,12 +144,14 @@ mediaRouter.post('/', express.raw({ type: () => true, limit: KINDS.mp4.max }), a
 mediaRouter.post('/generate', aiLimiter, async (req, res) => {
   const tenant = req.tenant!;
   if (!tenant.modules.aiImages) throw new ApiError(403, 'Este cliente no tiene activada la IA de imágenes');
-  if (!config.geminiApiKey) throw new ApiError(503, 'La IA de imágenes no está configurada en la plataforma');
+  // Primero la clave propia del cliente (la pone el super administrador); si no tiene, la de la plataforma.
+  const apiKey = (await getAiKey(tenant.id)) || config.geminiApiKey;
+  if (!apiKey) throw new ApiError(503, 'La IA de imágenes no está configurada: falta la clave API de este cliente');
   const p = generateSchema.safeParse(req.body ?? {});
   if (!p.success) throw new ApiError(400, 'Datos inválidos');
   const source = await readOwn(tenant.id, p.data.imageUrl);
   const prompt = AI_STYLES[p.data.style] + (p.data.extra?.trim() ? ` Additional instructions from the customer: ${p.data.extra.trim()}` : '');
-  const url = await store(tenant.id, await generateImage(source, prompt));
+  const url = await store(tenant.id, await generateImage(apiKey, source, prompt));
   log.info('imagen generada con IA', { tenant: tenant.id, style: p.data.style });
   res.json({ url });
 });

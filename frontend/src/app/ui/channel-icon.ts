@@ -8,7 +8,7 @@ export const CHANNEL_COLORS: Record<ChannelType, string> = {
   messenger: '#0084ff',
   telegram: '#229ed9',
   tiktok: '#111111',
-  webchat: '#ff6b1a',
+  webchat: '#1a9dd9',
   email: '#6366f1',
 };
 

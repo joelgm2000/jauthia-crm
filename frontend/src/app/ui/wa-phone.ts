@@ -28,7 +28,7 @@ export function templateToMessages(t: WaTemplate, products: Product[], companyNa
     .bar { display: flex; align-items: center; gap: 8px; background: #075e54; color: #fff; padding: 10px 12px; }
     :root[data-theme='dark'] .bar { background: #202c33; }
     .bar small { display: block; opacity: .75; font-size: 11px; }
-    .av { width: 32px; height: 32px; border-radius: 50%; background: #ff6b1a; display: grid; place-items: center; font-weight: 800; }
+    .av { width: 32px; height: 32px; border-radius: 50%; background: #1a9dd9; display: grid; place-items: center; font-weight: 800; }
     .screen { min-height: 380px; max-height: 520px; overflow-y: auto; padding: 14px 10px; display: flex; flex-direction: column; }
     .screen app-message-bubble { max-width: 92%; }
   `,

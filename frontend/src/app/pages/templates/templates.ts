@@ -100,7 +100,7 @@ import { WaPhone } from '../../ui/wa-phone';
     .list { display: flex; flex-direction: column; gap: 10px; }
     .t { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--text); }
     .t small { color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .t.on { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(255,107,26,.15); }
+    .t.on { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(26, 157, 217,.15); }
     .prods { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 260px; overflow-y: auto; }
     .pp { display: flex; flex-direction: column; gap: 4px; border: 2px solid var(--line); border-radius: 10px; background: var(--panel); padding: 0 0 6px; overflow: hidden; cursor: pointer; font-size: 12px; color: var(--text); }
     .pp img { width: 100%; aspect-ratio: 4/3; object-fit: cover; }
