@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { productCard, productDetail } from '@shared/products';
+import { productCard, productDetails } from '@shared/products';
 import { slugify, splitList } from '@shared/text';
 import { CatalogCategory, CatalogConfig, ChatMessage, Product } from '@shared/models';
 import { AuthService } from '../../core/auth.service';
@@ -9,10 +9,12 @@ import { newId } from '@shared/ids';
 import { Icon } from '../../ui/icon';
 import { MessageBubble } from '../../ui/message-bubble';
 import { CopPipe } from '../../ui/pipes';
+import { ProductMedia } from './product-media';
+import { QuickAdd } from './quick-add';
 
 @Component({
   selector: 'app-catalog',
-  imports: [FormsModule, Icon, CopPipe, MessageBubble],
+  imports: [FormsModule, Icon, CopPipe, MessageBubble, ProductMedia, QuickAdd],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page">
@@ -22,7 +24,8 @@ import { CopPipe } from '../../ui/pipes';
         <input class="input" style="width:240px" placeholder="Buscar…" [ngModel]="q()" (ngModelChange)="q.set($event)" />
         @if (auth.isAdmin()) {
           <button class="btn" (click)="openCategories()"><app-icon name="tag" [size]="15" /> Categorías</button>
-          <button class="btn primary" (click)="newProduct()"><app-icon name="plus" [size]="15" /> Producto</button>
+          <button class="btn" (click)="newProduct()"><app-icon name="plus" [size]="15" /> Producto</button>
+          <button class="btn primary" (click)="quick.set(true)"><app-icon name="sparkles" [size]="15" /> Carga rápida</button>
         }
       </div>
       <div class="row wrap" style="margin-bottom:14px">
@@ -38,7 +41,8 @@ import { CopPipe } from '../../ui/pipes';
       <div class="grid">
         @for (p of filtered(); track p.id) {
           <article class="card prod" [class.off]="!p.active" (click)="auth.isAdmin() && edit(p)">
-            <img [src]="p.imageUrl" [alt]="p.name" />
+            @if (p.imageUrl) { <img [src]="p.imageUrl" [alt]="p.name" /> } @else { <div class="noimg"><app-icon name="image" [size]="28" /></div> }
+            @if (p.videoUrl) { <span class="vid badge"><app-icon name="play" [size]="11" /> Video</span> }
             <span class="avail badge" [class.ok]="p.availability === 'tienda'" [class.warn]="p.availability === 'bodega'" [class.high]="p.availability === 'agotado'">{{ p.availability }}</span>
             <div class="pb">
               <small class="cap">{{ catName(p.category) }} · {{ p.subcategory }}{{ gym() && p.line ? ' · ' + p.line : '' }}</small>
@@ -72,7 +76,7 @@ import { CopPipe } from '../../ui/pipes';
                     <select class="select" [(ngModel)]="p.line"><option [ngValue]="undefined">—</option><option value="hogar">Hogar</option><option value="institucional">Institucional</option><option value="profesional">Profesional</option></select></div>
                 }
               </div>
-              <div class="field"><label>URL de la imagen (JPG/PNG pública para WhatsApp)</label><input class="input" [(ngModel)]="p.imageUrl" /></div>
+              <div class="field"><label>Fotos y video</label><app-product-media [product]="p" [aiEnabled]="!!auth.modules().aiImages" (changed)="touch()" /></div>
               <div class="field"><label>Descripción</label><textarea class="textarea" [(ngModel)]="p.description"></textarea></div>
               <div class="field"><label>Palabras clave que activan el producto (separadas por coma)</label><input class="input" [ngModel]="p.keywords.join(', ')" (ngModelChange)="p.keywords = splitList($event)" /></div>
               <div class="grid-2">
@@ -110,6 +114,10 @@ import { CopPipe } from '../../ui/pipes';
       </div>
     }
 
+    @if (quick()) {
+      <app-quick-add [defaultCategory]="cat() === 'all' ? (store.categories()[0]?.id ?? '') : cat()" (done)="quickDone($event)" (closed)="quick.set(false)" />
+    }
+
     @if (catEdit(); as cfg) {
       <div class="overlay" (click)="catEdit.set(null)">
         <div class="modal" (click)="$event.stopPropagation()">
@@ -145,7 +153,9 @@ import { CopPipe } from '../../ui/pipes';
     .prod { overflow: hidden; cursor: pointer; position: relative; transition: transform .15s, box-shadow .15s; }
     .prod:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
     .prod.off { opacity: .5; }
-    .prod img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+    .prod img, .noimg { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+    .noimg { display: grid; place-items: center; background: var(--hover); color: var(--muted); }
+    .vid { position: absolute; top: 10px; left: 10px; display: flex; gap: 3px; align-items: center; }
     .avail { position: absolute; top: 10px; right: 10px; text-transform: capitalize; }
     .pb { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
     .cap { text-transform: capitalize; }
@@ -167,6 +177,9 @@ export class Catalog {
   readonly q = signal('');
   readonly cat = signal<string>('all');
   readonly editing = signal<Product | null>(null);
+  readonly quick = signal(false);
+  /** Cambia cuando el editor de fotos modifica el producto (para refrescar la vista previa). */
+  readonly rev = signal(0);
 
   readonly filtered = computed(() => {
     const q = this.q().toLowerCase();
@@ -209,6 +222,16 @@ export class Catalog {
     this.store.toast('Categorías guardadas', 'success');
   }
 
+  touch(): void {
+    this.rev.update((n) => n + 1);
+  }
+
+  quickDone(p: Product): void {
+    this.quick.set(false);
+    this.editing.set(p);
+    this.store.toast('Producto organizado: revisa los datos y toca Guardar', 'info');
+  }
+
   edit(p: Product): void {
     this.editing.set(structuredClone(p));
   }
@@ -228,9 +251,10 @@ export class Catalog {
 
   preview(p: Product): ChatMessage[] {
     const base = { conversationId: 'pv', direction: 'out' as const, sender: 'bot' as const, createdAt: Date.now(), status: 'read' as const };
+    this.rev(); // se recalcula cuando cambian las fotos o el video
     return [
       { ...base, id: 'c', type: 'carousel', text: '', cards: [productCard(p)] },
-      { ...base, id: 'd', ...productDetail(p) },
+      ...productDetails(p).map((d, i) => ({ ...base, id: 'd' + i, ...d })),
     ];
   }
 
@@ -242,6 +266,8 @@ export class Catalog {
       else clean[k] = Number(v);
     }
     if (!clean.mode) delete clean.mode;
+    if (!clean.gallery?.length) delete clean.gallery;
+    if (!clean.videoUrl) delete clean.videoUrl;
     if (!clean.line) delete clean.line;
     if (!clean.category) {
       this.store.toast('Primero crea al menos una categoría', 'error');

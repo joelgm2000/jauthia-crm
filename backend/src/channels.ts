@@ -78,6 +78,9 @@ export function waPayloads(m: ChatMessage, base?: string): object[] {
     return (m.cards ?? []).map((c: ProductCard) => cardPayload(c, base));
   }
 
+  const video = absUrl(m.videoUrl, base);
+  if (video) return [{ type: 'video', video: { link: video, ...(m.text ? { caption: cut(m.text, 1024) } : {}) } }];
+
   const image = absUrl(m.imageUrl, base);
   const header = image ? { type: 'image', image: { link: image } } : m.header ? { type: 'text', text: cut(m.header, 60) } : undefined;
 
@@ -151,6 +154,8 @@ export function metaPayloads(m: ChatMessage, base?: string): object[] {
       buttons: postbacks(c.buttons),
     })))];
   }
+  const video = absUrl(m.videoUrl, base);
+  if (video) return [{ attachment: { type: 'video', payload: { url: video, is_reusable: true } } }];
   if (m.type === 'product' && absUrl(m.imageUrl, base)) {
     return [
       generic([{ title: cut(m.header ?? 'Producto', 80), subtitle: cut(plain(m.text).split('\n')[0], 80), image_url: absUrl(m.imageUrl, base), buttons: postbacks(m.buttons ?? []) }]),
@@ -192,8 +197,11 @@ async function sendTelegram(chatId: string, m: ChatMessage, s: Secrets): Promise
   } else {
     const text = plain([m.header, m.text, m.footer].filter(Boolean).join('\n'));
     const photo = absUrl(m.imageUrl, s.publicBaseUrl);
+    const video = absUrl(m.videoUrl, s.publicBaseUrl);
     const markup = m.buttons?.length ? { reply_markup: kb(m.buttons) } : {};
-    res = photo
+    res = video
+      ? await api('sendVideo', { chat_id: chatId, video, caption: cut(text, 1024), ...markup })
+      : photo
       ? await api('sendPhoto', { chat_id: chatId, photo, caption: cut(text, 1024), ...markup })
       : await api('sendMessage', { chat_id: chatId, text, ...markup });
   }

@@ -69,6 +69,12 @@ export function productDetail(p: Product, companyName = ''): OutgoingDraft {
   };
 }
 
+/** "Ver detalles": el video del producto (si tiene) y luego la ficha con los botones. */
+export function productDetails(p: Product, companyName = ''): OutgoingDraft[] {
+  const video: OutgoingDraft[] = p.videoUrl ? [{ type: 'video', videoUrl: p.videoUrl, text: `🎬 ${p.name}` }] : [];
+  return [...video, productDetail(p, companyName)];
+}
+
 /** Productos mencionados en un texto libre ("¿tienen caminadoras?"). */
 export function detectProducts(text: string, products: Product[]): Product[] {
   const t = normalize(text);

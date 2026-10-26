@@ -4,6 +4,7 @@
  *   /api/auth/*        inicio de sesión (cookie httpOnly)
  *   /api/super/*       panel de la plataforma (super administradores)
  *   /api/*             API del CRM (requiere sesión, rol y cliente activo)
+ *   /media/*           fotos y videos del catálogo (públicos, nombres al azar)
  *   /webhooks/*        WhatsApp, Messenger/Instagram, Telegram, chat web
  *   /socket.io         tiempo real para la bandeja
  *   /health            estado del servidor (para Docker)
@@ -22,6 +23,7 @@ import { startAutomation } from './automation';
 import { startDispatcher } from './dispatcher';
 import { migrate, pool } from './db';
 import { log } from './log';
+import { serveMedia } from './media';
 import { startRealtime } from './realtime';
 import { superRouter } from './super';
 import { webhooksRouter } from './webhooks';
@@ -43,7 +45,9 @@ async function main(): Promise<void> {
           scriptSrc: ["'self'", "'unsafe-inline'"],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-          imgSrc: ["'self'", 'data:', 'https:'],
+          // blob: vista previa de las fotos y videos antes de subirlos.
+          imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+          mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
           connectSrc: ["'self'", 'ws:', 'wss:'],
           frameAncestors: ["'none'"],
         },
@@ -78,6 +82,8 @@ async function main(): Promise<void> {
     next();
   };
   if (productsDir) app.use('/products', crossOrigin, express.static(productsDir, { maxAge: '7d' }));
+  // Fotos y videos que suben los clientes (y los generados con IA).
+  app.use('/media', serveMedia, (_req, res) => res.status(404).end());
 
   // Script del widget de chat web para pegar en el sitio del cliente.
   const widgetFile = [path.resolve(__dirname, '../widget/widget.js'), path.resolve(__dirname, '../../../widget/widget.js')].find((f) => existsSync(f));
@@ -86,7 +92,7 @@ async function main(): Promise<void> {
   // Frontend compilado (opcional: en el VPS lo puede servir Nginx/Caddy).
   if (config.frontendDir && existsSync(config.frontendDir)) {
     app.use(express.static(config.frontendDir, { maxAge: '1h', index: false }));
-    app.get(/^\/(?!api|webhooks|socket\.io|widget\.js|products).*/, (_req, res) => res.sendFile(path.join(config.frontendDir, 'index.html')));
+    app.get(/^\/(?!api|webhooks|socket\.io|widget\.js|products|media).*/, (_req, res) => res.sendFile(path.join(config.frontendDir, 'index.html')));
   }
 
   // Errores: nunca se envían detalles internos al navegador.

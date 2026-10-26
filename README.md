@@ -62,6 +62,12 @@ contacto, **qué contrató** (CRM, Chatbot o ambos), plan, mensualidad, día de 
   El botón **Probar conexión** valida los datos contra Meta o Telegram; en Telegram registra el webhook solo.
 - **Catálogo:** cada cliente crea **sus categorías y tipos de producto**. Los filtros de gimnasio (peso máximo,
   caminar/trotar, techo) solo aparecen si los activa.
+  **Carga rápida:** pega el producto como lo escribirías en WhatsApp (nombre, precio y una característica por línea)
+  y adjunta las fotos y un video MP4: se organiza solo (precio, ficha técnica, peso máximo, categoría y palabras clave)
+  y se abre el editor para revisar. Las fotos se reducen a JPG antes de subirlas y el video se envía con "Ver detalles".
+- **IA de imágenes (módulo opcional):** el súper admin la activa por cliente. Genera fotos del producto
+  (fondo de estudio, en ambiente o publicitaria) a partir de la foto principal, con la clave de Gemini de la
+  plataforma (`GEMINI_API_KEY` en el `.env` del servidor; máximo 30 imágenes por hora por cliente).
 - **Flujo del bot:** preguntas, botones, rutas, mensajes y seguimientos propios. Una pregunta puede tomar sus opciones
   directamente de las categorías del catálogo. `{empresa}` se reemplaza por el nombre del negocio.
 - **Configuración:** horario, reglas comerciales, puntaje para 🔥 y **mensajes mínimos antes de marcar 🔥** (por defecto 3).
@@ -153,8 +159,11 @@ Sirve cualquier VPS Ubuntu con Docker (Hetzner, Contabo, DigitalOcean…). La op
    correo), arranca todo y programa la copia de seguridad diaria. Caddy saca el certificado HTTPS gratis.
    **Guarda una copia del `.env`** (sobre todo `SECRETS_KEY`): sin ella no se pueden leer los tokens de tus clientes.
 4. Abre `https://TU-DOMINIO` y crea la cuenta del dueño.
-5. Actualizar a una versión nueva: vuelve a empaquetar y subir, descomprime encima (el `.env` no se toca) y ejecuta
-   `docker compose up -d --build`.
+   Opcional: para la IA de imágenes, agrega `GEMINI_API_KEY=...` (aistudio.google.com → Get API key) al `.env` y
+   ejecuta `docker compose up -d`. Las fotos y videos de los clientes quedan en el volumen `media` y entran en la
+   copia de seguridad diaria.
+5. Actualizar a una versión nueva: `git pull && docker compose up -d --build` (o vuelve a empaquetar y subir el zip).
+   El `.env` y los volúmenes no se tocan.
 
 ### Widget de chat para el sitio web
 

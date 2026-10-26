@@ -23,11 +23,12 @@ const button = z.object({ id: short(64), title: short(40), description: short(10
 const card = z.object({ productId: id, title: short(80), subtitle: short(200), imageUrl: url, buttons: z.array(button).max(3) });
 
 const draft = z.object({
-  type: z.enum(['text', 'buttons', 'list', 'carousel', 'product', 'image', 'template']), // los asesores no envían notas por aquí
+  type: z.enum(['text', 'buttons', 'list', 'carousel', 'product', 'image', 'video', 'template']), // los asesores no envían notas por aquí
   text: short(4096),
   header: short(120).optional(),
   footer: short(120).optional(),
   imageUrl: url.optional(),
+  videoUrl: url.optional(),
   buttons: z.array(button).max(10).optional(),
   listButton: short(40).optional(),
   cards: z.array(card).max(10).optional(),
@@ -54,7 +55,8 @@ const task = z.object({
 
 const product = z.object({
   id, name: short(120).min(1), category: short(60).min(1), subcategory: short(60),
-  keywords: z.array(short(60)).max(40), imageUrl: url, price: z.number().min(0).max(1e12),
+  keywords: z.array(short(60)).max(40), imageUrl: url,
+  gallery: z.array(url).max(20).optional(), videoUrl: url.optional(), price: z.number().min(0).max(1e12),
   line: z.enum(PRODUCT_LINES).optional(), availability: z.enum(AVAILABILITIES),
   description: short(2000), specs: z.array(z.object({ label: short(60), value: short(200) })).max(30),
   maxUserKg: z.number().min(0).max(1000).optional(), mode: z.enum(USE_MODES).optional(),

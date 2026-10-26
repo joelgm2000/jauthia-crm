@@ -55,6 +55,7 @@ backups/
 
 # Datos locales y pruebas (nunca al repositorio)
 .pgdata/
+media/
 qa/pgtest/
 qa/results/
 qa/.qa-owner

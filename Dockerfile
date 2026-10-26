@@ -21,6 +21,8 @@ COPY --from=build /src/backend/node_modules ./node_modules
 COPY --from=build /src/backend/package.json ./package.json
 COPY --from=build /src/backend/widget ./widget
 COPY --from=build /src/frontend/dist/jauthia-crm/browser ./web
+# Carpeta de fotos y videos (el volumen hereda el dueño "node").
+RUN mkdir -p /app/media && chown node:node /app/media
 # Usuario sin privilegios (no root) dentro del contenedor.
 USER node
 EXPOSE 3000

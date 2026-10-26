@@ -29,7 +29,7 @@ const tenant = z.object({
   contactName: short(120).optional(),
   contactEmail: z.union([emailSchema, z.literal('')]).optional(),
   contactPhone: short(40).optional(),
-  modules: z.object({ crm: z.boolean(), chatbot: z.boolean() }).refine((m) => m.crm || m.chatbot, 'Elige al menos un módulo'),
+  modules: z.object({ crm: z.boolean(), chatbot: z.boolean(), aiImages: z.boolean().optional() }).refine((m) => m.crm || m.chatbot, 'Elige al menos un módulo'),
   plan: z.object({ name: short(60), price: z.number().min(0).max(1e10), currency: short(10), billingDay: z.number().int().min(1).max(28) }),
   status: z.enum(TENANT_STATUSES),
   trialEndsAt: z.number().nullable().optional(),

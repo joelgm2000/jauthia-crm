@@ -12,4 +12,6 @@ export PLATFORM_OWNER_EMAIL=joelgarciamaestrejgm@gmail.com
 export CORS_ORIGINS=http://localhost:3100 PUBLIC_BASE_URL=http://localhost:3100
 export FRONTEND_DIR="C:/Users/JOEL/Documents/JAUTHIA CRM EvoSport/jauthia-crm/frontend/dist/jauthia-crm/browser"
 export TRUST_PROXY=${TRUST_PROXY:-}
+export MEDIA_DIR="C:/Users/JOEL/Documents/JAUTHIA CRM EvoSport/jauthia-crm/qa/results/media"
+export GEMINI_API_KEY=${GEMINI_API_KEY:-}
 exec node node_modules/tsx/dist/cli.mjs src/server.ts

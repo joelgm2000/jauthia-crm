@@ -19,6 +19,7 @@ import { config } from './config';
 import { settingsWithTeam } from './core';
 import { getSetting, listDocs, listMessages } from './db';
 import { log } from './log';
+import { mediaRouter } from './media';
 import { actionSchemas, id } from './schemas';
 import { secretsStatus } from './secrets';
 
@@ -34,6 +35,7 @@ const userLimiter = rateLimit({
   message: { error: 'Demasiadas solicitudes, espera un momento' },
 });
 apiRouter.use(requireCsrfHeader, requireAuth, requireTenant, userLimiter);
+apiRouter.use('/media', mediaRouter);
 
 /** Todo lo que la interfaz necesita al cargar (solo datos del cliente activo). */
 apiRouter.get('/bootstrap', async (req, res) => {

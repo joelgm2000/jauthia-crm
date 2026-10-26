@@ -264,8 +264,8 @@ const webchatLimiter = rateLimit({ windowMs: MINUTE, limit: 20, standardHeaders:
 const pollLimiter = rateLimit({ windowMs: MINUTE, limit: 40, standardHeaders: true, legacyHeaders: false });
 
 function forWidget(m: ChatMessage) {
-  const { id, direction, type, text, header, footer, imageUrl, buttons, cards, listButton, createdAt } = m;
-  return { id, direction, type, text, header, footer, imageUrl, buttons, cards, listButton, createdAt };
+  const { id, direction, type, text, header, footer, imageUrl, videoUrl, buttons, cards, listButton, createdAt } = m;
+  return { id, direction, type, text, header, footer, imageUrl, videoUrl, buttons, cards, listButton, createdAt };
 }
 
 webhooksRouter.post('/:tenantId/webchat', webchatLimiter, tenantParam, async (req, res) => {

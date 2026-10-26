@@ -7,7 +7,7 @@ import { canBeHot, DEFAULT_FLOW, FlowConfig, FlowNode, FlowOption, STAGE_ORDER, 
 import { isOpen, nextOpening } from './hours';
 import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, StageId } from './models';
 import { parseNameCity } from './parse';
-import { AVAIL_LABEL, BTN, detectProducts, OutgoingDraft, productCard, productDetail, recommend } from './products';
+import { AVAIL_LABEL, BTN, detectProducts, OutgoingDraft, productCard, productDetails, recommend } from './products';
 import { applyTone, missingRequired, NO_CITY, personaOf, RequiredDatum, requiredOf } from './seller';
 import { hash, includesWord, normalize, titleCase } from './text';
 
@@ -162,7 +162,7 @@ class Run {
       if (input.buttonId?.startsWith(BTN.details)) {
         const p = this.ctx.products.find((x) => x.id === input.buttonId!.slice(BTN.details.length));
         if (p) {
-          this.replies.push(productDetail(p, this.ctx.settings.companyName));
+          this.replies.push(...productDetails(p, this.ctx.settings.companyName));
           this.setIntent('producto', `Vio la ficha de ${p.name}`, [p.id]);
           this.scoreDelta += 10;
         }
@@ -272,7 +272,7 @@ class Run {
       // "Me gusta la Vigor": un modelo concreto → su ficha con "Lo quiero" (no otro carrusel).
       if (mentioned.length === 1) {
         const p = mentioned[0];
-        this.replies.push(productDetail(p, this.ctx.settings.companyName));
+        this.replies.push(...productDetails(p, this.ctx.settings.companyName));
         this.setIntent('producto', `Le interesa ${p.name}`, [p.id]);
         this.scoreDelta += 10;
         if (!c.bot.shownProductIds.includes(p.id)) c.bot.shownProductIds.push(p.id);
@@ -662,7 +662,7 @@ class Run {
     if (id.startsWith(BTN.details)) {
       const p = this.ctx.products.find((x) => x.id === id.slice(BTN.details.length));
       if (!p) return false;
-      this.replies.push(productDetail(p, this.ctx.settings.companyName));
+      this.replies.push(...productDetails(p, this.ctx.settings.companyName));
       this.setIntent('producto', `Vio la ficha de ${p.name}`, [p.id]);
       this.scoreDelta += 10;
       if (!c.bot.shownProductIds.includes(p.id)) c.bot.shownProductIds.push(p.id);

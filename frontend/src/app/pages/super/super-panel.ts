@@ -95,7 +95,8 @@ export class SuperPanel implements OnInit {
   }
 
   modulesLabel(t: Tenant): string {
-    return t.modules.crm && t.modules.chatbot ? 'CRM + Chatbot' : t.modules.crm ? 'Solo CRM' : 'Solo Chatbot';
+    const base = t.modules.crm && t.modules.chatbot ? 'CRM + Chatbot' : t.modules.crm ? 'Solo CRM' : 'Solo Chatbot';
+    return t.modules.aiImages ? `${base} + IA` : base;
   }
 
   dueState(t: TenantSummary): 'vencido' | 'pronto' | '' {

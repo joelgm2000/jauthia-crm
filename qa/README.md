@@ -7,6 +7,7 @@ Nunca tocan la base de desarrollo (5433) ni el backend de `npm run dev` (3000).
 cd qa && npm install          # una vez (puppeteer-core, usa el Chrome instalado)
 sh restart.sh                 # base vacía + backend de QA
 node security.mjs final       # 59 pruebas de seguridad      → results/security-final.json
+sh restart.sh && node media.mjs   # fotos, videos e IA de imágenes → results/media.json
 sh restart.sh
 node conversations.mjs        # 10 conversaciones del bot      → results/conversations.json
 node shots.mjs tenant         # capturas del CRM               → results/shots/

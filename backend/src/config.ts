@@ -1,5 +1,6 @@
 /** Configuración del servidor, leída de variables de entorno (archivo backend/.env). */
 import 'dotenv/config';
+import path from 'node:path';
 
 function required(name: string, fallback?: string): string {
   const v = process.env[name] ?? fallback;
@@ -49,6 +50,14 @@ export const config = {
     if (!v || v === 'false' || v === '0') return false;
     return /^\d+$/.test(v) ? Number(v) : v;
   })() as boolean | number | string,
+  /** Carpeta donde se guardan las fotos y videos que suben los clientes (una subcarpeta por cliente). */
+  mediaDir: process.env.MEDIA_DIR || path.resolve('media'),
+  /** Espacio máximo por cliente para fotos y videos, en MB. */
+  mediaQuotaMb: Number(process.env.MEDIA_QUOTA_MB ?? 1024),
+  /** Clave de Google AI Studio (Gemini) de la plataforma, para generar fotos de producto. Vacía = IA apagada. */
+  geminiApiKey: process.env.GEMINI_API_KEY ?? '',
+  /** Modelo de Gemini que edita y genera imágenes. */
+  aiImageModel: process.env.AI_IMAGE_MODEL || 'gemini-2.5-flash-image',
   /** Carpeta con el build del frontend para servirlo desde el mismo servidor (opcional). */
   frontendDir: process.env.FRONTEND_DIR ?? '',
 };

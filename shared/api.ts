@@ -20,6 +20,9 @@ export const TENANT_ROLES = ['admin', 'asesor'] as const;
 export type TenantRole = (typeof TENANT_ROLES)[number];
 /** Largo mínimo de contraseña (backend y formularios). */
 export const PASSWORD_MIN = 10;
+/** Estilos de la IA de imágenes del catálogo. */
+export const AI_IMAGE_STYLES = ['estudio', 'ambiente', 'publicidad'] as const;
+export type AiImageStyle = (typeof AI_IMAGE_STYLES)[number];
 
 /** ¿Puede configurar el cliente? (su administrador o un super administrador). */
 export function canAdminTenant(role: Role | undefined): boolean {

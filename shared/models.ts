@@ -66,6 +66,10 @@ export interface Product {
   /** Palabras que disparan este producto en el chat (ej: caminadora, trotadora, banda). */
   keywords: string[];
   imageUrl: string;
+  /** Más fotos del producto (subidas o generadas con IA); imageUrl es la principal. */
+  gallery?: string[];
+  /** Video MP4 que el bot envía con la ficha ("Ver detalles"). */
+  videoUrl?: string;
   price: number;
   /** Línea (gimnasios): hogar, institucional o profesional. */
   line?: (typeof PRODUCT_LINES)[number];
@@ -125,6 +129,7 @@ export type MessageType =
   | 'carousel'
   | 'product'
   | 'image'
+  | 'video'
   | 'note'
   | 'template';
 
@@ -140,6 +145,8 @@ export interface ChatMessage {
   header?: string;
   footer?: string;
   imageUrl?: string;
+  /** Video MP4 (mensajes de tipo "video"). */
+  videoUrl?: string;
   buttons?: QuickButton[];
   /** Título del botón que abre la lista (WhatsApp list message). */
   listButton?: string;
@@ -348,6 +355,8 @@ export interface TenantModules {
   crm: boolean;
   /** Bot con flujo personalizado, catálogo y plantillas. */
   chatbot: boolean;
+  /** Generar fotos de producto con la IA de la plataforma (lo activa el super admin). */
+  aiImages?: boolean;
 }
 
 export interface Tenant {

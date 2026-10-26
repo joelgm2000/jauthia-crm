@@ -43,8 +43,9 @@ export interface ButtonPick {
       <time class="t">{{ m.createdAt | hour }} @if (m.direction === 'out') { <app-icon [name]="m.status === 'read' ? 'checks' : 'check'" [size]="13" [class.read]="m.status === 'read'" /> }</time>
     } @else {
       <div class="who">{{ who() }}</div>
-      <div class="bubble" [class.has-img]="!!m.imageUrl">
+      <div class="bubble" [class.has-img]="!!m.imageUrl || !!m.videoUrl">
         @if (m.imageUrl) { <img class="hero" [src]="m.imageUrl" [alt]="m.header || 'imagen'" loading="lazy" /> }
+        @if (m.videoUrl) { <video class="hero" [src]="m.videoUrl" controls preload="metadata" playsinline></video> }
         @if (m.header) { <div class="header">{{ m.header }}</div> }
         <div class="text" [innerHTML]="m.text | wa"></div>
         @if (m.footer) { <div class="footer">{{ m.footer }}</div> }
@@ -88,6 +89,7 @@ export interface ButtonPick {
     .bubble.has-img { padding: 4px 4px 6px; max-width: 320px; }
     .bubble.has-img .text, .bubble.has-img .header, .bubble.has-img .footer { padding: 0 6px; }
     .hero { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 7px; margin-bottom: 6px; }
+    video.hero { object-fit: contain; background: #000; }
     .header { font-weight: 700; margin-bottom: 2px; }
     .footer { font-size: 12px; color: var(--muted); margin-top: 4px; }
     time { display: flex; gap: 3px; align-items: center; justify-content: flex-end; font-size: 11px; color: var(--muted); margin-top: 2px; }
