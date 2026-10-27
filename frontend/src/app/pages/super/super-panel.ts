@@ -5,6 +5,8 @@ import { CrmUserInfo, PASSWORD_MIN, TenantSummary } from '@shared/api';
 import { Tenant, TenantStatus } from '@shared/models';
 import { AuthService } from '../../core/auth.service';
 import { CrmStore } from '../../core/data/crm-store';
+import { EMPTY_PROFILE, BusinessProfile } from '@shared/market';
+import { BusinessProfileForm, cleanProfile } from '../../ui/business-profile-form';
 import { Icon } from '../../ui/icon';
 import { AgoPipe, CopPipe } from '../../ui/pipes';
 import { DAY } from '@shared/time';
@@ -22,7 +24,7 @@ function emptyTenant(): Tenant {
 
 @Component({
   selector: 'app-super-panel',
-  imports: [FormsModule, Icon, CopPipe, AgoPipe],
+  imports: [FormsModule, Icon, CopPipe, AgoPipe, BusinessProfileForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './super-panel.html',
   styleUrl: './super-panel.css',
@@ -99,7 +101,14 @@ export class SuperPanel implements OnInit {
 
   modulesLabel(t: Tenant): string {
     const base = t.modules.crm && t.modules.chatbot ? 'CRM + Chatbot' : t.modules.crm ? 'Solo CRM' : 'Solo Chatbot';
-    return t.modules.aiImages ? `${base} + IA` : base;
+    return base + (t.modules.aiImages ? ' + IA' : '') + (t.modules.market ? ' + Mercado' : '');
+  }
+
+  /** Perfil del negocio del cliente en edición (se crea vacío la primera vez). */
+  profileOf(t: Tenant): BusinessProfile {
+    t.profile ??= structuredClone(EMPTY_PROFILE);
+    t.profile.competitors ??= [];
+    return t.profile;
   }
 
   dueState(t: TenantSummary): 'vencido' | 'pronto' | '' {
@@ -147,7 +156,10 @@ export class SuperPanel implements OnInit {
       this.store.toast(`La contraseña del administrador debe tener al menos ${PASSWORD_MIN} caracteres`, 'error');
       return;
     }
-    const payload: Tenant = { ...t, plan: { ...t.plan, price: Number(t.plan.price) || 0, billingDay: Number(t.plan.billingDay) || 1 } };
+    const payload: Tenant = {
+      ...t, plan: { ...t.plan, price: Number(t.plan.price) || 0, billingDay: Number(t.plan.billingDay) || 1 },
+      ...(t.profile ? { profile: cleanProfile(t.profile) } : {}),
+    };
     if (isNew) delete (payload as Partial<Tenant>).id;
     const aiApiKey = this.aiKeyRemove ? '' : this.aiKey.trim() || undefined;
     const { tenant } = await this.store.superCall('saveTenant', {

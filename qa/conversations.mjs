@@ -45,13 +45,14 @@ const SCENARIOS = [
     key: 'caminadora', channel: 'whatsapp', name: 'María Fernanda',
     title: 'Caso reportado: "Quiero comprar una caminadora"',
     goal: 'El cliente debe ver los productos ANTES de pasar al asesor.',
-    steps: [{ text: 'Hola' }, { text: 'Quiero comprar una caminadora' }, { text: 'María Fernanda, de Valledupar' }, { pick: 'sel', title: 'Lo quiero' }, { btn: 'qty_1', title: '1' }],
+    steps: [{ text: 'Hola' }, { text: 'Quiero comprar una caminadora' }, { text: 'María Fernanda, de Valledupar' }, { pick: 'sel', title: 'Lo quiero' }, { btn: 'qty_1', title: '1' }, { btn: 'cart_done', title: 'No, es todo' }],
     checks: [
       ['Muestra el carrusel de caminadoras con imagen, Ver detalles y Lo quiero', (s) => s.after[1].some((m) => m.type === 'carousel' && m.cards?.length)],
       ['No pasa al asesor apenas dice "quiero comprar"', (s) => s.convAt[1].botActive === true && !s.convAt[1].hot],
       ['Pide nombre y ciudad con la pregunta corta', (s) => s.after[1].some((m) => /cómo te llamas/i.test(m.text ?? ''))],
       ['Al tocar "Lo quiero" pide la cantidad (dato obligatorio) antes de pasar', (s) => s.after[3].some((m) => /Cuántas unidades/.test(m.text ?? '')) && s.convAt[3].botActive === true],
-      ['Con la cantidad pasa al asesor y queda 🔥 caliente', (s) => s.final.hot === true && s.final.botActive === false && s.final.fields?.cantidad === '1'],
+      ['Con la cantidad pregunta si le interesa otro producto, con su pedido', (s) => s.after[4].some((m) => /otros productos/.test(m.text ?? '') && /1 × Trotadora/.test(m.text) && m.buttons?.length === 2) && s.convAt[4].botActive === true],
+      ['"No, es todo": pasa al asesor y queda 🔥 caliente', (s) => s.final.hot === true && s.final.botActive === false && s.final.fields?.cantidad === '1' && s.final.cart?.length === 1],
     ],
   },
   {
@@ -70,13 +71,14 @@ const SCENARIOS = [
     key: 'precio', channel: 'instagram', name: 'Carlos Ruiz',
     title: 'Caso reportado: pregunta el precio de entrada (Instagram)',
     goal: 'El bot lleva el control: saluda primero, muestra opciones, hace UNA pregunta a la vez, reconoce el nombre y califica hasta recomendar.',
-    steps: [{ text: '¿Cuánto vale la trotadora?' }, { text: 'Carlos de Bosconia' }, { btn: 'uso_hogar', title: 'Para mi casa' }, { text: '80 kg' }, { btn: 'modo_trotar', title: 'Trotar' }, { btn: 'cant_1', title: '1' }, { pick: 'sel', title: 'Lo quiero' }],
+    steps: [{ text: '¿Cuánto vale la trotadora?' }, { text: 'Carlos de Bosconia' }, { btn: 'uso_hogar', title: 'Para mi casa' }, { text: '80 kg' }, { btn: 'modo_trotar', title: 'Trotar' }, { btn: 'cant_1', title: '1' }, { pick: 'sel', title: 'Lo quiero' }, { text: 'no gracias' }],
     checks: [
       ['El saludo va primero, en el mismo mensaje', (s) => /^¡Hola!/.test(s.after[0][0]?.text ?? '')],
       ['Tras las opciones hace una sola pregunta (nombre y ciudad)', (s) => { const said = s.after[0].filter((m) => m.type !== 'carousel' && m.type !== 'note'); return said.length === 2 && /cómo te llamas/.test(said[1].text) && !/cómo te llamas/.test(said[0].text); }],
       ['Reconoce el nombre: "Mucho gusto, Carlos"', (s) => s.after[1].some((m) => /Mucho gusto, Carlos/.test(m.text ?? ''))],
       ['Califica (uso, peso, caminar/trotar) y recomienda según eso', (s) => s.after[5].some((m) => m.type === 'carousel')],
-      ['Al elegir pasa al asesor como 🔥 caliente', (s) => s.final.hot === true && s.final.botActive === false],
+      ['Al elegir usa la cantidad que ya dijo y pregunta si quiere otro producto', (s) => s.after[6].some((m) => m.buttons?.some((b) => b.id === 'cart_done')) && !s.after[6].some((m) => /Cuántas unidades/.test(m.text ?? ''))],
+      ['"No gracias": pasa al asesor como 🔥 caliente', (s) => s.final.hot === true && s.final.botActive === false],
     ],
   },
   {
@@ -106,13 +108,40 @@ const SCENARIOS = [
     key: 'datos', channel: 'whatsapp', name: 'Pedro Gómez',
     title: 'Datos obligatorios antes de pasar al asesor',
     goal: 'El vendedor siempre debe saber nombre, ciudad, producto y cantidad: si falta alguno lo pregunta, uno a la vez, antes de pasar al asesor.',
-    steps: [{ text: 'Hola' }, { text: 'Me llamo Pedro' }, { text: 'Bosconia' }, { text: '¿Tienen caminadoras?' }, { text: 'la quiero comprar' }, { pick: 'sel', title: 'Trotadora Latte' }, { text: 'dos' }],
+    steps: [{ text: 'Hola' }, { text: 'Me llamo Pedro' }, { text: 'Bosconia' }, { text: '¿Tienen caminadoras?' }, { text: 'la quiero comprar' }, { pick: 'sel', title: 'Trotadora Latte' }, { text: 'dos' }, { text: 'listo, eso es todo' }],
     checks: [
       ['Se presenta como Sofía, la asesora virtual', (s) => /Soy Sofía/.test(s.after[0][0]?.text ?? '')],
       ['Dio el nombre sin ciudad: pide la ciudad enseguida', (s) => s.after[1].some((m) => /Desde qué ciudad/.test(m.text ?? ''))],
       ['Quiere comprar sin elegir modelo: le pide cuál, con botones de los que vio', (s) => s.after[4].some((m) => m.type === 'buttons' && m.buttons?.some((b) => /^sel_/.test(b.id)))],
       ['Elige el modelo: pide la cantidad', (s) => s.after[5].some((m) => /Cuántas unidades/.test(m.text ?? ''))],
       ['Con los 4 datos pasa al asesor', (s) => s.final.botActive === false && s.final.name === 'Pedro' && s.final.fields?.ciudad === 'Bosconia' && !!s.final.fields?.modeloInteres && s.final.fields?.cantidad === '2-3'],
+    ],
+  },
+  {
+    key: 'varios', channel: 'whatsapp', name: 'Camila Rojas',
+    title: 'Quiere comprar varios productos',
+    goal: 'Cada "Lo quiero" se suma al pedido (con su cantidad); al final pregunta si le interesa otro producto y, cuando dice que no, pasa al asesor con todo el pedido.',
+    steps: [{ text: 'Hola, quiero una caminadora' }, { text: 'Camila de Valledupar' }, { pick: 'sel', title: 'Lo quiero' }, { btn: 'qty_1', title: '1' }, { btn: 'cart_more', title: 'Sí, ver otros' }, { btn: 'cat_peso', title: 'Peso libre' }, { text: 'mancuernas' }, { text: '2,5 a 10 kg, 4 pares' }, { btn: 'uso_hogar', title: 'Para mi casa' }, { pick: 'sel', title: 'Lo quiero' }, { btn: 'qty_4', title: '4 o más' }, { btn: 'cart_done', title: 'No, es todo' }],
+    checks: [
+      ['"Sí, ver otros" muestra las categorías sin perder el pedido', (s) => s.after[4].some((m) => m.type === 'list') && s.convAt[4].cart?.length === 1 && s.convAt[4].botActive === true],
+      ['No repite nombre ni ciudad para el segundo producto', (s) => !s.after.slice(4).flat().some((m) => /cómo te llamas|qué ciudad/i.test(m.text ?? ''))],
+      ['El segundo producto pide su propia cantidad', (s) => s.after[9].some((m) => /Cuántas unidades/.test(m.text ?? ''))],
+      ['Muestra el pedido con los dos productos', (s) => s.after[10].some((m) => /1 × Trotadora/.test(m.text ?? '') && /4\+ × Mancuernas/.test(m.text))],
+      ['Pasa al asesor con los dos productos, cada uno con su cantidad', (s) => s.final.botActive === false && s.final.cart?.length === 2 && s.final.cart[0].qty === '1' && s.final.cart[1].qty === '4+'],
+      ['El valor estimado suma todo el pedido', (s) => s.final.value === s.final.cart?.[0]?.price + 4 * s.final.cart?.[1]?.price],
+      ['La nota para el asesor lista el pedido completo', (s) => /Pedido: 1 × Trotadora .*, 4\+ × Mancuernas/.test(s.final.summary ?? '')],
+    ],
+  },
+  {
+    key: 'devuelto', channel: 'whatsapp', name: 'Andrés Polo',
+    title: 'El asesor le devuelve la conversación al bot',
+    goal: 'El bot recuerda todo (nombre, ciudad y pedido) y, cuando el cliente vuelve a escribir, le ofrece agregar otros productos.',
+    steps: [{ text: 'Hola, busco una bicicleta de spinning' }, { text: 'Andrés de Valledupar' }, { pick: 'sel', title: 'Lo quiero' }, { btn: 'qty_1', title: '1' }, { btn: 'cart_done', title: 'No, es todo' }, { action: 'toggleBot' }, { text: 'gracias por la atención' }, { text: 'tienen mancuernas?' }],
+    checks: [
+      ['Primero pasa al asesor con el pedido', (s) => s.convAt[4].botActive === false && s.convAt[4].cart?.length === 1],
+      ['Al reactivar el bot conserva nombre, ciudad y pedido', (s) => s.convAt[5].botActive === true && s.convAt[5].name === 'Andrés' && s.convAt[5].fields?.ciudad === 'Valledupar' && s.convAt[5].cart?.length === 1],
+      ['Saluda de nuevo y ofrece otros productos (no dice "no te entendí")', (s) => s.after[6].some((m) => /de nuevo/.test(m.text ?? '') && m.type === 'list') && !s.after[6].some((m) => /no te entendí/i.test(m.text ?? ''))],
+      ['Si pide otro producto ("¿tienen mancuernas?"), sigue con ese producto sin volver a preguntar la categoría', (s) => s.after[7].some((m) => /rango de peso/.test(m.text ?? '')) && !s.after[7].some((m) => m.type === 'list')],
     ],
   },
   {
@@ -170,8 +199,11 @@ for (const sc of SCENARIOS) {
   const checks = sc.checks.map(([name, fn]) => ({ name, pass: !!fn(s) }));
   console.log(`\n${sc.title}`);
   checks.forEach((k) => console.log(`  ${k.pass ? '✔' : '✘'} ${k.name}`));
+  // Si algo falla, se muestra qué respondió el bot en cada paso.
+  const brief = (m) => `${m.type}: ${(m.text ?? '').split('\n').join(' / ').slice(0, 110)} ${(m.buttons ?? []).map((b) => b.id).join(',')} ${(m.cards ?? []).map((x) => x.productId).join(',')}`;
+  if (checks.some((k) => !k.pass)) after.forEach((a, i) => console.log('    paso', i, JSON.stringify(sc.steps[i]), '→', a.map(brief).join(' || ')));
   console.log(`  → etapa ${final.stage}, caliente ${final.hot}, puntaje ${final.score}, bot ${final.botActive ? 'activo' : 'pausado'}`);
-  out.push({ ...sc, checks, id: c.id, messages: all, final: { stage: final.stage, hot: final.hot, score: final.score, botActive: final.botActive, fields: final.fields, intent: final.intent, name: final.name } });
+  out.push({ ...sc, checks, id: c.id, messages: all, final: { stage: final.stage, hot: final.hot, score: final.score, botActive: final.botActive, fields: final.fields, intent: final.intent, name: final.name, cart: final.cart, value: final.value } });
 }
 mkdirSync(new URL('./results/', import.meta.url), { recursive: true });
 writeFileSync(new URL('./results/conversations.json', import.meta.url), JSON.stringify({ tenant: tenant.id, scenarios: out }, null, 2));

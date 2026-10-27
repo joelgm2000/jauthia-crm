@@ -15,7 +15,7 @@ import { ApiError, AuthUser, createUser, getTenant, listUsers, publicUser, requi
 import { invalidateCtx, publishTeam } from './core';
 import { pool } from './db';
 import { log } from './log';
-import { emailSchema, passwordSchema, short, tenantRole } from './schemas';
+import { businessProfile, emailSchema, passwordSchema, short, tenantRole } from './schemas';
 import { getAiKey, setAiKey } from './secrets';
 import { seedTenant } from './tenants';
 
@@ -30,12 +30,13 @@ const tenant = z.object({
   contactName: short(120).optional(),
   contactEmail: z.union([emailSchema, z.literal('')]).optional(),
   contactPhone: short(40).optional(),
-  modules: z.object({ crm: z.boolean(), chatbot: z.boolean(), aiImages: z.boolean().optional() }).refine((m) => m.crm || m.chatbot, 'Elige al menos un módulo'),
+  modules: z.object({ crm: z.boolean(), chatbot: z.boolean(), aiImages: z.boolean().optional(), market: z.boolean().optional() }).refine((m) => m.crm || m.chatbot, 'Elige CRM, chatbot o ambos'),
   plan: z.object({ name: short(60), price: z.number().min(0).max(1e10), currency: short(10), billingDay: z.number().int().min(1).max(28) }),
   status: z.enum(TENANT_STATUSES),
   trialEndsAt: z.number().nullable().optional(),
   nextDueAt: z.number().nullable().optional(),
   notes: short(2000).optional(),
+  profile: businessProfile.optional(),
   createdAt: z.number().optional(),
 });
 

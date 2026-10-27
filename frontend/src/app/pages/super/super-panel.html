@@ -116,10 +116,11 @@
           <label class="mod" [class.on]="t.modules.crm"><input type="checkbox" [(ngModel)]="t.modules.crm" /> <b>CRM</b><small>Bandeja omnicanal, embudo, contactos, tareas y resumen.</small></label>
           <label class="mod" [class.on]="t.modules.chatbot"><input type="checkbox" [(ngModel)]="t.modules.chatbot" /> <b>Chatbot</b><small>Bot con flujo personalizado, catálogo, carruseles y plantillas.</small></label>
           <label class="mod" [class.on]="t.modules.aiImages"><input type="checkbox" [(ngModel)]="t.modules.aiImages" /> <b>IA de imágenes</b><small>Genera fotos del producto (estudio, ambiente, publicidad) con IA. Usa la clave API del cliente o, si no tiene, la de la plataforma.</small></label>
+          <label class="mod" [class.on]="t.modules.market"><input type="checkbox" [(ngModel)]="t.modules.market" /> <b>Inteligencia de mercado</b><small>Analiza la competencia, sugiere dónde enfocarse, crea ideas de guiones y busca clientes potenciales con IA.</small></label>
         </div>
-        @if (t.modules.aiImages) {
+        @if (t.modules.aiImages || t.modules.market) {
           <div class="field ai-key">
-            <label>Clave API de la IA de imágenes (Google Gemini)</label>
+            <label>Clave API de la IA (Google Gemini) <small class="muted">sirve para imágenes e inteligencia de mercado</small></label>
             <input class="input" type="password" name="ai-api-key" autocomplete="new-password" spellcheck="false" autocapitalize="off"
               [placeholder]="aiKeySaved() && !aiKeyRemove ? '••••••••••••  (guardada)' : 'Pega aquí la clave de este cliente'"
               [(ngModel)]="aiKey" (copy)="$event.preventDefault()" (cut)="$event.preventDefault()" />
@@ -129,6 +130,11 @@
               @else { Se guarda cifrada y nadie podrá verla después. Si la dejas vacía, usa la clave de la plataforma. }
             </small>
           </div>
+        }
+
+        @if (t.modules.market) {
+          <h3>Perfil del negocio <small class="muted">para la inteligencia de mercado (el cliente también puede editarlo)</small></h3>
+          <app-business-profile-form [profile]="profileOf(t)" />
         }
 
         <h3>Plan mensual</h3>

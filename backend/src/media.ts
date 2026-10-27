@@ -97,7 +97,7 @@ interface GeminiPart { text?: string; inlineData?: { mimeType?: string; data?: s
 interface GeminiResponse { candidates?: { content?: { parts?: GeminiPart[] } }[] }
 
 async function generateImage(apiKey: string, source: { data: Buffer; mime: string }, prompt: string): Promise<Buffer> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.aiImageModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `${config.aiBaseUrl}/v1beta/models/${encodeURIComponent(config.aiImageModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const r = await fetchJson<GeminiResponse>(url, {
     body: {
       contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: source.mime, data: source.data.toString('base64') } }] }],

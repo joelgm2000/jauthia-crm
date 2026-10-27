@@ -1,0 +1,161 @@
+<div class="page" style="max-width:1120px">
+  <div class="page-head">
+    <div><h1>Inteligencia de mercado</h1><p>Tu competencia, ideas de contenido y clientes potenciales, investigados en internet con IA.</p></div>
+    <span class="spacer"></span>
+    @if (!loading()) { <span class="chip" title="Análisis que puedes pedir en las próximas 24 horas"><app-icon name="sparkles" [size]="13" /> {{ remaining() }} análisis disponibles hoy</span> }
+  </div>
+
+  <div class="tabs">
+    @for (t of tabs; track t.id) {
+      <button [class.on]="tab() === t.id" (click)="tab.set(t.id)"><app-icon [name]="t.icon" [size]="15" /> {{ t.label }}</button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="card card-pad muted">Cargando…</div>
+  } @else {
+    @let t = tab();
+    @if (isKind(t)) {
+      @if (missing().length) {
+        <div class="banner warn">
+          <app-icon name="info" [size]="16" />
+          <div>Para investigar, completa el perfil del negocio: falta {{ missing().join(', ') }}.</div>
+          <button class="btn sm" (click)="tab.set('perfil')">Completar perfil</button>
+        </div>
+      }
+
+      <section class="card run">
+        <p class="muted">{{ hints[t].intro }}</p>
+        @if (auth.isAdmin()) {
+          <div class="run-row">
+            <input class="input" maxlength="400" [placeholder]="hints[t].placeholder" [(ngModel)]="request[t]" (keydown.enter)="run(t)" [disabled]="!!busy()" />
+            <button class="btn primary" [disabled]="!!busy() || !!missing().length || remaining() < 1" (click)="run(t)">
+              <app-icon name="sparkles" [size]="15" /> {{ hints[t].button }}
+            </button>
+          </div>
+        } @else {
+          <small class="muted">Solo un administrador puede pedir análisis nuevos.</small>
+        }
+        @if (busy() === t) {
+          <div class="busy"><span class="spin"></span> La IA está investigando en internet. Puede tardar 1 o 2 minutos; no cierres esta página.</div>
+        }
+      </section>
+
+      @if (current(t); as r) {
+        <div class="report-head">
+          <h2>{{ kindLabel[t] }}</h2>
+          <span class="spacer"></span>
+          @if (history(t).length > 1) {
+            <select class="select sm" [ngModel]="r.id" (ngModelChange)="select(t, $event)" title="Análisis anteriores">
+              @for (h of history(t); track h.id) { <option [value]="h.id">{{ when(h.createdAt) }}{{ h.request ? ' · ' + h.request.slice(0, 40) : '' }}</option> }
+            </select>
+          }
+        </div>
+        <p class="meta muted">{{ when(r.createdAt, true) }} · por {{ r.by }}@if (r.request) { · "{{ r.request }}" }</p>
+        @if (r.summary) { <div class="card summary"><app-icon name="sparkles" [size]="16" /><p>{{ r.summary }}</p></div> }
+
+        <!-- ============ Competencia ============ -->
+        @if (t === 'competencia') {
+          @if (r.opportunities?.length) {
+            <h3 class="sec"><app-icon name="target" [size]="16" /> Dónde enfocarte que la competencia no</h3>
+            <div class="opps">
+              @for (o of r.opportunities; track $index) {
+                <div class="card opp">
+                  <b>{{ o.title }}</b>
+                  <p>{{ o.why }}</p>
+                  @if (o.action) { <p class="action"><app-icon name="check" [size]="13" /> {{ o.action }}</p> }
+                </div>
+              }
+            </div>
+          }
+          @if (r.competitors?.length) {
+            <h3 class="sec"><app-icon name="trend" [size]="16" /> Competidores</h3>
+            <div class="comps">
+              @for (c of r.competitors; track $index) {
+                <div class="card comp">
+                  <div class="comp-head">
+                    <b>{{ c.name }}</b>
+                    @if (c.url) { <a [href]="c.url" target="_blank" rel="noopener noreferrer nofollow" title="Abrir"><app-icon name="external" [size]="14" /></a> }
+                  </div>
+                  @if (c.offer) { <p>{{ c.offer }}</p> }
+                  <div class="sw">
+                    <div><small class="ok">Fortalezas</small>@for (s of c.strengths; track $index) { <span>✓ {{ s }}</span> }</div>
+                    <div><small class="bad">Debilidades</small>@for (s of c.weaknesses; track $index) { <span>✗ {{ s }}</span> }</div>
+                  </div>
+                  @if (c.presence) { <p class="muted presence"><app-icon name="map" [size]="13" /> {{ c.presence }}</p> }
+                </div>
+              }
+            </div>
+          }
+        }
+
+        <!-- ============ Guiones ============ -->
+        @if (t === 'guiones') {
+          <div class="scripts">
+            @for (s of r.scripts; track $index) {
+              <div class="card script">
+                <div class="row wrap gap-6"><span class="chip">{{ s.format }}</span><span class="chip soft">{{ s.angle }}</span><span class="spacer"></span>
+                  <button class="btn ghost icon-only sm" title="Copiar guion" (click)="copy(scriptText(s))"><app-icon name="copy" [size]="14" /></button></div>
+                <b class="title">{{ s.title }}</b>
+                <p class="hook"><small>Gancho (primeros 3 s)</small>{{ s.hook }}</p>
+                <ol>@for (x of s.scenes; track $index) { <li>{{ x }}</li> }</ol>
+                @if (s.cta) { <p class="cta"><app-icon name="send" [size]="13" /> {{ s.cta }}</p> }
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ============ Clientes potenciales ============ -->
+        @if (t === 'clientes') {
+          <div class="row export"><span class="spacer"></span><button class="btn sm" (click)="exportLeads(r)"><app-icon name="list" [size]="14" /> Exportar a Excel (CSV)</button></div>
+          <div class="leads">
+            @for (l of r.leads; track $index) {
+              <div class="card lead">
+                <div class="lead-head">
+                  <div><b>{{ l.name }}</b><small class="muted">{{ l.type }}{{ l.city ? ' · ' + l.city : '' }}</small></div>
+                  <span class="stars" [title]="'Qué tan buen prospecto es: ' + l.fit + ' de 5'">{{ stars(l.fit) }}</span>
+                </div>
+                <p>{{ l.why }}</p>
+                <div class="approach">
+                  <small>Mensaje sugerido</small>
+                  <p>{{ l.approach }}</p>
+                </div>
+                <div class="row wrap gap-6">
+                  <button class="btn sm" (click)="copy(l.approach)"><app-icon name="copy" [size]="13" /> Copiar mensaje</button>
+                  @if (waLink(l); as wa) { <a class="btn sm" [href]="wa" target="_blank" rel="noopener noreferrer"><app-icon name="phone" [size]="13" /> WhatsApp</a> }
+                  @if (l.instagram) { <a class="btn sm" [href]="l.instagram" target="_blank" rel="noopener noreferrer nofollow"><app-icon name="external" [size]="13" /> Instagram</a> }
+                  @if (l.website) { <a class="btn sm" [href]="l.website" target="_blank" rel="noopener noreferrer nofollow"><app-icon name="external" [size]="13" /> Web</a> }
+                  @if (l.phone) { <span class="muted phone">{{ l.phone }}</span> }
+                </div>
+              </div>
+            }
+          </div>
+          <p class="muted note">Son datos públicos de empresas encontrados en internet: verifícalos antes de contactar y respeta a quien no quiera recibir mensajes.</p>
+        }
+
+        @if (r.sources.length) {
+          <details class="sources">
+            <summary>Fuentes consultadas ({{ r.sources.length }})</summary>
+            <ul>@for (s of r.sources; track s.url) { <li><a [href]="s.url" target="_blank" rel="noopener noreferrer nofollow">{{ s.title }}</a></li> }</ul>
+          </details>
+        }
+      } @else if (!busy()) {
+        <div class="empty card card-pad">
+          <app-icon name="target" [size]="28" />
+          <p>Aún no hay análisis de este tipo. @if (auth.isAdmin()) { Toca <b>{{ hints[t].button }}</b> para empezar. }</p>
+        </div>
+      }
+    } @else {
+      <!-- ============ Perfil del negocio ============ -->
+      <section class="card card-pad">
+        <p class="muted">Con esta información la IA investiga a tu competencia y a tus clientes potenciales. Entre más clara, mejores resultados.</p>
+        <app-business-profile-form [profile]="profile()" (changed)="profileDirty.set(true)" />
+        @if (auth.isAdmin()) {
+          <div class="row mt"><span class="spacer"></span>
+            <button class="btn primary" [disabled]="!profileDirty() || savingProfile()" (click)="saveProfile()"><app-icon name="check" [size]="15" /> Guardar perfil</button>
+          </div>
+        }
+      </section>
+    }
+  }
+</div>

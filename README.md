@@ -69,6 +69,16 @@ contacto, **qué contrató** (CRM, Chatbot o ambos), plan, mensualidad, día de 
   (fondo de estudio, en ambiente o publicitaria) a partir de la foto principal. Usa la clave de Gemini que el súper
   admin pone en *Editar cliente* (se guarda cifrada y nadie puede volver a verla) o, si el cliente no tiene, la de la
   plataforma (`GEMINI_API_KEY` en el `.env` del servidor). Máximo 30 imágenes por hora por cliente.
+- **Inteligencia de mercado (módulo opcional, servicio aparte):** el súper admin la activa por cliente y llena el
+  **perfil del negocio** en *Editar cliente* (qué hace, nicho, zona, cliente ideal, diferenciales, web, redes y
+  competidores; el administrador del cliente también puede editarlo). La IA (Gemini con búsqueda de Google) investiga
+  en internet y entrega:
+  - **Competencia:** qué hace cada competidor, fortalezas, debilidades y **dónde enfocarse que la competencia no**,
+    con una acción concreta para cada oportunidad.
+  - **Guiones:** ideas de Reels, TikTok, historias y carruseles con gancho, escenas y llamado a WhatsApp.
+  - **Clientes potenciales:** negocios reales (solo datos públicos de empresas, nunca personas) con web, teléfono,
+    Instagram, por qué podrían comprar, un mensaje de primer contacto, botón de WhatsApp y exportar a Excel.
+  Usa la misma clave de Gemini del cliente. Tope de 20 análisis por día por cliente (`MARKET_DAILY_LIMIT`) y uno a la vez.
 - **Flujo del bot:** preguntas, botones, rutas, mensajes y seguimientos propios. Una pregunta puede tomar sus opciones
   directamente de las categorías del catálogo. `{empresa}` se reemplaza por el nombre del negocio.
 - **Configuración:** horario, reglas comerciales, puntaje para 🔥 y **mensajes mínimos antes de marcar 🔥** (por defecto 3).
@@ -79,6 +89,13 @@ contacto, **qué contrató** (CRM, Chatbot o ambos), plan, mensualidad, día de 
   y muestra la lista de categorías. Luego sigue con las preguntas de ese producto y pide nombre y ciudad antes de recomendar.
 - Si dice el nombre y el producto en el mismo mensaje, guarda ambos y le muestra el producto.
 - **Nunca marca 🔥 "a punto de comprar" en los primeros mensajes** (mínimo 3, configurable).
+- **Pedido con varios productos:** cada *Lo quiero* se suma al pedido con su propia cantidad. Luego el bot pregunta
+  **"¿Te interesa alguno de nuestros otros productos?"**: si dice que sí, le muestra las categorías (sin volver a pedir
+  nombre ni ciudad); si dice que no, pasa al asesor con el pedido completo, el valor sumado y la nota
+  *"Pedido: 1 × Trotadora, 2-3 × Mancuernas"*. Si no contesta en 15 minutos (configurable), pasa al asesor igual.
+- **Cuando el asesor le devuelve el chat al bot**, el bot recuerda todo (nombre, ciudad, respuestas y pedido). Si el
+  cliente vuelve a escribir, lo saluda de nuevo y le ofrece otros productos; si gana o pierde la venta, el siguiente
+  pedido empieza vacío.
 
 ## Estructura: frontend y backend separados
 

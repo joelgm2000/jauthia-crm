@@ -127,6 +127,27 @@ await act('setStage', { conversationId: buyer.id, stage: 'ganado' });
 await sleep(800);
 check(buyer, 'Pasar luego a Ganado no repite la alerta', (await msgs(al.id)).filter((m) => m.authorName === 'Alerta de compra').length === 1);
 results.push(al, buyer);
+
+// ---------------------------------------------------------------------------
+// 3) Pedido sin respuesta a "¿te interesa otro producto?": pasa solo al asesor
+// ---------------------------------------------------------------------------
+console.log('\nPedido sin respuesta');
+const cartConv = (await act('createTestConversation', { channel: 'whatsapp', name: 'Valeria Cotes' })).conversation;
+const cartScenario = { id: cartConv.id, key: 'pedido-espera', title: 'Eligió un producto y no contestó "¿te interesa otro?"', checks: [] };
+await act('simulateIncoming', { conversationId: cartConv.id, text: 'Hola, quiero una caminadora' });
+await act('simulateIncoming', { conversationId: cartConv.id, text: 'Valeria de Valledupar' });
+const firstCard = [...(await msgs(cartConv.id))].reverse().find((m) => m.cards?.length).cards[0].productId;
+await act('simulateIncoming', { conversationId: cartConv.id, buttonId: `sel_${firstCard}`, title: 'Lo quiero' });
+await act('simulateIncoming', { conversationId: cartConv.id, buttonId: 'qty_1', title: '1' });
+check(cartScenario, 'Queda esperando la respuesta con el bot activo', (await conv(cartConv.id)).bot.nodeId === 'carrito');
+remarketingAt(0.1); // 6 minutos: aún no
+check(cartScenario, 'A los 6 minutos todavía espera', (await conv(cartConv.id)).botActive === true);
+remarketingAt(0.3); // 18 minutos: pasa al asesor
+const cv = await conv(cartConv.id);
+check(cartScenario, 'A los 15 minutos pasa al asesor con su pedido', cv.botActive === false && cv.stage === 'asesor' && cv.cart?.length === 1);
+check(cartScenario, 'Le avisa al cliente que una asesora le escribe', (await msgs(cartConv.id)).some((m) => m.sender === 'bot' && /asesora/.test(m.text ?? '') && m.createdAt > Date.now()));
+check(cartScenario, 'Crea la tarea "Cotizar a" para el asesor', (await boot()).tasks.some((t) => t.conversationId === cartConv.id && /Cotizar a Valeria/.test(t.title)));
+results.push(cartScenario);
 await db.end();
 
 for (const r of results) {

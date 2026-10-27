@@ -128,3 +128,9 @@
   .banner > div { flex: 1 1 calc(100% - 50px); }
   .banner .spacer { display: none; }
 }
+
+/* Pedido del cliente (varios productos) */
+.cart-row { display: flex; gap: 6px; align-items: baseline; font-size: 13px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.cart-row:last-child { border-bottom: 0; }
+.cart-row span { flex: 1; min-width: 0; }
+.cart-row small { color: var(--muted); white-space: nowrap; }

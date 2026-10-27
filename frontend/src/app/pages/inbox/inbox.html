@@ -193,6 +193,15 @@
           </div>
         </div>
 
+        @if (c.cart?.length) {
+          <div class="block cart">
+            <span class="label"><app-icon name="box" [size]="13" /> Pedido ({{ c.cart!.length }})</span>
+            @for (it of c.cart; track it.productId) {
+              <div class="cart-row"><b>{{ it.qty || '1' }} ×</b> <span>{{ it.name }}</span><small>{{ it.price | cop: true }}</small></div>
+            }
+          </div>
+        }
+
         @if (c.summary) {
           <div class="block summary">
             <span class="label"><app-icon name="bot" [size]="13" /> Nota resumen del bot</span>

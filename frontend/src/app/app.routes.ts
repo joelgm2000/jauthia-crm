@@ -21,6 +21,7 @@ export const routes: Routes = [
       { path: 'templates', loadComponent: () => import('./pages/templates/templates').then((m) => m.Templates) },
       { path: 'flow', canActivate: [moduleGuard('chatbot')], loadComponent: () => import('./pages/flow/flow-editor').then((m) => m.FlowEditor) },
       { path: 'automation', canActivate: [moduleGuard('chatbot')], loadComponent: () => import('./pages/automation/automation').then((m) => m.Automation) },
+      { path: 'market', canActivate: [moduleGuard('market')], loadComponent: () => import('./pages/market/market').then((m) => m.Market) },
       { path: 'channels', loadComponent: () => import('./pages/channels/channels').then((m) => m.Channels) },
       { path: 'settings', loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings) },
     ],

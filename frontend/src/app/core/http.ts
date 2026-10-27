@@ -10,7 +10,7 @@ export class HttpError extends Error {
  * Petición al backend. La sesión viaja en una cookie httpOnly (el código no puede leerla)
  * y el encabezado X-CRM-Request protege contra CSRF.
  */
-export async function api<T>(path: string, opts: { method?: 'GET' | 'POST'; body?: unknown } = {}): Promise<T> {
+export async function api<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PUT'; body?: unknown } = {}): Promise<T> {
   const res = await fetch(environment.apiUrl + path, {
     method: opts.method ?? 'GET',
     credentials: 'include',

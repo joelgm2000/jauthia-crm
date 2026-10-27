@@ -14,4 +14,5 @@ export FRONTEND_DIR="C:/Users/JOEL/Documents/JAUTHIA CRM EvoSport/jauthia-crm/fr
 export TRUST_PROXY=${TRUST_PROXY:-}
 export MEDIA_DIR="C:/Users/JOEL/Documents/JAUTHIA CRM EvoSport/jauthia-crm/qa/results/media"
 export GEMINI_API_KEY=${GEMINI_API_KEY:-}
+export AI_BASE_URL=${AI_BASE_URL:-}
 exec node node_modules/tsx/dist/cli.mjs src/server.ts

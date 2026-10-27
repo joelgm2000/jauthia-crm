@@ -139,7 +139,17 @@ export interface FlowConfig {
     handoffPayment?: string;
     /** Traspaso cuando pide hablar con una persona. */
     handoffHuman?: string;
+    /** Tras elegir un producto: "¿Quieres agregar otro?" ({pedido} = lista del pedido). */
+    askMore?: string;
+    /** Cuando quiere agregar otro producto al pedido. */
+    addAnother?: string;
+    /** Cuando un asesor le devuelve la conversación al bot y el cliente vuelve a escribir. */
+    welcomeBack?: string;
   };
+  /** Tras cada "Lo quiero", preguntar si quiere agregar otro producto antes de pasar al asesor (por defecto sí). */
+  askMoreProducts?: boolean;
+  /** Minutos sin respuesta a "¿agregar otro?" para pasar al asesor con lo que lleva (por defecto 15). */
+  cartWaitMinutes?: number;
   /** Máximo de opciones por carrusel (el flujo pide 1 a 3). */
   maxOptions: number;
   /** Veces que el bot puede no entender antes de pasar al asesor. */

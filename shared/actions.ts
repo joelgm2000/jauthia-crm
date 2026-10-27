@@ -61,8 +61,14 @@ export const BOT_RESUMED_NOTE = '🤖 Bot reactivado';
 
 export function botToggle(conv: Conversation): { patch: Partial<Conversation>; note: string } {
   const botActive = !conv.botActive;
-  const bot = botActive && conv.bot.nodeId === 'handoff' ? { ...conv.bot, nodeId: 'recomendar' } : conv.bot;
-  return { patch: { botActive, bot }, note: botActive ? BOT_RESUMED_NOTE : BOT_PAUSED_NOTE };
+  if (!botActive) return { patch: { botActive }, note: BOT_PAUSED_NOTE };
+  // El bot conserva todo lo que sabe (nombre, ciudad, respuestas y pedido) y retoma desde las opciones.
+  // Tras un traspaso, cuando el cliente vuelva a escribir le ofrece agregar más productos al pedido.
+  const afterHandoff = conv.bot.nodeId === 'handoff';
+  const bot = { ...conv.bot, retries: 0, pendingHandoff: null, ...(afterHandoff ? { nodeId: 'recomendar', resumed: true } : {}) };
+  // Venta cerrada o perdida: lo que pida ahora es un pedido nuevo.
+  const closed = conv.stage === 'ganado' || conv.stage === 'perdido';
+  return { patch: { botActive, bot, ...(closed ? { cart: [] } : {}) }, note: BOT_RESUMED_NOTE };
 }
 
 /** Cambios en la conversación cuando el asesor envía un mensaje. */

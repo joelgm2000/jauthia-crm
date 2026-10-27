@@ -2,6 +2,7 @@
  * Modelos compartidos entre el frontend (Angular) y el backend (Node/Express).
  * No importar nada de Angular ni de Node aquí: lo usan el frontend y el backend.
  */
+import type { BusinessProfile } from './market';
 
 export type ChannelType =
   | 'whatsapp'
@@ -187,7 +188,20 @@ export interface BotState {
   /** El cliente nos dijo su nombre (el del perfil de WhatsApp/Instagram puede ser un apodo). */
   nameGiven?: boolean;
   /** Traspaso al asesor en espera: se hace apenas el cliente complete los datos obligatorios. */
-  pendingHandoff?: { reason: string; intent?: IntentType } | null;
+  pendingHandoff?: { reason: string; intent?: IntentType; offerMore?: boolean } | null;
+  /** La cantidad guardada en fields.cantidad ya se asignó a un producto del pedido. */
+  qtyUsed?: boolean;
+  /** Un asesor le devolvió la conversación al bot después de un traspaso. */
+  resumed?: boolean;
+}
+
+/** Un producto del pedido del cliente (puede llevar varios). */
+export interface CartItem {
+  productId: string;
+  name: string;
+  price: number;
+  /** Cantidad tal como la eligió el cliente ("1", "2-3", "4+"); vacía mientras no la diga. */
+  qty: string;
 }
 
 export interface Conversation {
@@ -203,6 +217,8 @@ export interface Conversation {
   botActive: boolean;
   bot: BotState;
   fields: ContactFields;
+  /** Pedido: los productos que eligió el cliente con "Lo quiero". */
+  cart?: CartItem[];
   tags: string[];
   priority: 'alta' | 'normal';
   /** 0-100. Probabilidad estimada de compra. */
@@ -357,6 +373,8 @@ export interface TenantModules {
   chatbot: boolean;
   /** Generar fotos de producto con la IA de la plataforma (lo activa el super admin). */
   aiImages?: boolean;
+  /** Inteligencia de mercado: competencia, ideas de guiones y clientes potenciales (servicio aparte). */
+  market?: boolean;
 }
 
 export interface Tenant {
@@ -374,5 +392,7 @@ export interface Tenant {
   trialEndsAt?: number | null;
   nextDueAt?: number | null;
   notes?: string;
+  /** Perfil del negocio para la inteligencia de mercado (web, redes, cliente ideal, competidores). */
+  profile?: BusinessProfile;
   createdAt: number;
 }

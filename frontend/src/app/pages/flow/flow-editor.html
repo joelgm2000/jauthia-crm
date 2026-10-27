@@ -217,6 +217,18 @@
               <div class="field"><label>Traspaso por comprobante de pago</label><textarea class="textarea" [(ngModel)]="f.messages.handoffPayment" (ngModelChange)="touch()" placeholder="¡Gracias! 🙌 Una asesora verifica tu pago y te confirma el despacho."></textarea></div>
               <div class="field"><label>Traspaso cuando pide una persona</label><textarea class="textarea" [(ngModel)]="f.messages.handoffHuman" (ngModelChange)="touch()" placeholder="Claro 😊, ya le aviso a una asesora para que te escriba."></textarea></div>
             </div>
+            <div class="sub-head">
+              <b>Pedido con varios productos</b>
+              <label class="row" style="gap:6px"><input type="checkbox" [ngModel]="f.askMoreProducts !== false" (ngModelChange)="f.askMoreProducts = $event; touch()" /> Tras cada "Lo quiero", preguntar si le interesa otro producto</label>
+            </div>
+            @if (f.askMoreProducts !== false) {
+              <div class="grid-3">
+                <div class="field"><label>Pregunta tras elegir ({{ '{' }}pedido{{ '}' }} = lista)</label><textarea class="textarea" [(ngModel)]="f.messages.askMore" (ngModelChange)="touch()" placeholder="¡Listo! 🛒 Tu pedido va así: {pedido} ¿Te interesa alguno de nuestros otros productos?"></textarea></div>
+                <div class="field"><label>Cuando dice que sí</label><textarea class="textarea" [(ngModel)]="f.messages.addAnother" (ngModelChange)="touch()" placeholder="¡Claro! 😊 ¿Qué otro producto te gustaría ver?"></textarea></div>
+                <div class="field"><label>Cuando el asesor le devuelve el chat al bot</label><textarea class="textarea" [(ngModel)]="f.messages.welcomeBack" (ngModelChange)="touch()" placeholder="¡Hola de nuevo! 😊 Sigo aquí para ayudarte. ¿Qué otro producto te gustaría ver?"></textarea></div>
+              </div>
+              <div class="field" style="max-width:340px"><label>Si no contesta, pasar al asesor a los (minutos)</label><input class="input" type="number" min="5" max="1440" [ngModel]="f.cartWaitMinutes ?? 15" (ngModelChange)="f.cartWaitMinutes = +$event || 15; touch()" /></div>
+            }
             <div class="grid-3">
               <div class="field"><label>Opciones por carrusel</label><input class="input" type="number" min="1" max="10" [(ngModel)]="f.maxOptions" (ngModelChange)="touch()" /></div>
               <div class="field"><label>Intentos antes de pasar al asesor</label><input class="input" type="number" min="1" [(ngModel)]="f.maxRetries" (ngModelChange)="touch()" /></div>

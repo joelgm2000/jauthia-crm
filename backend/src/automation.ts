@@ -12,12 +12,13 @@
 import { previewOf } from '../../shared/actions';
 import { AutoContext, DEFAULT_SOCIAL_PROOF, followUpDue, interestProduct, socialProofDraft } from '../../shared/automation';
 import { STAGE_ORDER } from '../../shared/flow';
-import { noteMessage, outboundMessage } from '../../shared/messages';
+import { CART_NODE, cartTimeout } from '../../shared/flow-engine';
+import { materializeResult, noteMessage, outboundMessage } from '../../shared/messages';
 import { Conversation, StageId } from '../../shared/models';
 import { OutgoingDraft } from '../../shared/products';
 import { HOUR, MINUTE } from '../../shared/time';
 import { Ctx, loadCtx, notifyStageChange, STAGE_CHANGED } from './core';
-import { bus, getDoc, insertMessage, patchDoc, pool, txEmit } from './db';
+import { bus, getDoc, insertMessage, patchDoc, pool, putDoc, txEmit } from './db';
 import { log } from './log';
 
 function autoContext(ctx: Ctx, now: number): AutoContext {
@@ -42,6 +43,27 @@ async function saveAutomatic(
 }
 
 // ---------------------------------------------------------------------------
+// Pedido sin respuesta a "¿te interesa otro producto?"
+// ---------------------------------------------------------------------------
+
+/** Si venció la espera, pasa al asesor con el pedido. Devuelve true si lo hizo. */
+async function closeStaleCart(tenantId: string, ctx: Ctx, convId: string, now: number): Promise<boolean> {
+  const done = await txEmit(async (c) => {
+    // Se relee con bloqueo: el cliente pudo contestar justo ahora.
+    const conv = await getDoc<Conversation>(tenantId, 'conversations', convId, c, true);
+    const res = conv && cartTimeout({ conv, flow: ctx.flow, products: ctx.products, settings: ctx.settings, now });
+    if (!conv || !res) return null;
+    const out = materializeResult(res, conv, noteMessage(conv.id, '', now), now);
+    for (const m of [...out.replies, ...out.notes]) await insertMessage(tenantId, m, c);
+    if (ctx.tenant.modules.crm) for (const task of out.tasks) await putDoc(tenantId, 'tasks', task, c);
+    await patchDoc<Conversation>(tenantId, 'conversations', conv.id, { ...res.patch, lastMessage: out.lastMessage, lastMessageAt: out.lastMessageAt, waitingSince: now }, c);
+    return { from: conv.stage, to: res.patch.stage };
+  });
+  if (done) notifyStageChange(tenantId, convId, done.from, done.to);
+  return !!done;
+}
+
+// ---------------------------------------------------------------------------
 // Remarketing
 // ---------------------------------------------------------------------------
 
@@ -57,6 +79,7 @@ export async function runRemarketing(now = Date.now()): Promise<void> {
     // Una conversación con problemas no detiene el remarketing de las demás.
     try {
       const ctx = await loadCtx(tenantId);
+      if (conv.bot?.nodeId === CART_NODE && (await closeStaleCart(tenantId, ctx, conv.id, now))) continue;
       const action = followUpDue(conv, ctx.flow, autoContext(ctx, now));
       if (!action) continue;
       await saveAutomatic(tenantId, conv, now, { draft: action.message, author: 'Remarketing', note: action.note, patch: action.patch });

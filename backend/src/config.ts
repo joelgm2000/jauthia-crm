@@ -57,7 +57,13 @@ export const config = {
   /** Clave de Google AI Studio (Gemini) de la plataforma, para generar fotos de producto. Vacía = IA apagada. */
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
   /** Modelo de Gemini que edita y genera imágenes. */
+  /** Dirección de la API de Gemini (solo se cambia para pruebas con un servidor falso). */
+  aiBaseUrl: (process.env.AI_BASE_URL || 'https://generativelanguage.googleapis.com').replace(/\/$/, ''),
   aiImageModel: process.env.AI_IMAGE_MODEL || 'gemini-2.5-flash-image',
+  /** Modelo de Gemini que investiga en internet para la inteligencia de mercado (con búsqueda de Google). */
+  aiTextModel: process.env.AI_TEXT_MODEL || 'gemini-2.5-flash',
+  /** Análisis de inteligencia de mercado que puede pedir cada cliente por día. */
+  marketDailyLimit: Math.max(1, Number(process.env.MARKET_DAILY_LIMIT ?? 20)),
   /** Carpeta con el build del frontend para servirlo desde el mismo servidor (opcional). */
   frontendDir: process.env.FRONTEND_DIR ?? '',
 };

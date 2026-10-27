@@ -7,12 +7,16 @@ import { canBeHot, DEFAULT_FLOW, FlowConfig, FlowNode, FlowOption, STAGE_ORDER, 
 import { isOpen, nextOpening } from './hours';
 import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, StageId } from './models';
 import { parseNameCity } from './parse';
-import { AVAIL_LABEL, BTN, detectProducts, OutgoingDraft, productCard, productDetails, recommend } from './products';
+import { AVAIL_LABEL, BTN, cartText, cartValue, detectProducts, OutgoingDraft, productCard, productDetails, recommend } from './products';
 import { applyTone, missingRequired, NO_CITY, personaOf, RequiredDatum, requiredOf } from './seller';
 import { hash, includesWord, normalize, titleCase } from './text';
+import { MINUTE } from './time';
 
 export type { OutgoingDraft } from './products';
 export type TaskDraft = Omit<CrmTask, 'id' | 'createdAt'>;
+
+/** Paso del flujo en el que el bot pregunta si le interesa otro producto antes de pasar al asesor. */
+export const CART_NODE = 'carrito';
 
 export interface EngineInput {
   text?: string;
@@ -42,22 +46,25 @@ export interface EngineResult {
 
 export function buildSummary(conv: Conversation, products: Product[]): string {
   const f = conv.fields;
+  // Con varios productos en el pedido, la categoría y la disponibilidad de uno solo confunden.
+  const multi = (conv.cart?.length ?? 0) > 1;
   const model = f.modeloInteres || products.find((p) => conv.bot.lastProductIds.includes(p.id))?.name;
   const parts = [
     `Cliente: ${conv.name}`,
     f.ciudad,
     f.uso === 'hogar' ? 'Hogar' : f.uso === 'negocio' ? 'Gimnasio/negocio' : '',
-    f.subcategoria ? titleCase(f.subcategoria) : f.categoria ? titleCase(f.categoria) : '',
+    multi ? '' : f.subcategoria ? titleCase(f.subcategoria) : f.categoria ? titleCase(f.categoria) : '',
     f.pesoUsuario ? `${f.pesoUsuario} kg` : '',
     f.modoUso ? `Para ${f.modoUso}` : '',
     f.alturaTecho ? `Techo ${f.alturaTecho} cm` : '',
     f.piso ? titleCase(f.piso) : '',
     f.usuarios ? `${f.usuarios} usuarios` : '',
     f.rangoKg ? `Rango ${f.rangoKg}` : '',
-    f.cantidad ? `Cantidad: ${f.cantidad}` : '',
-    model ? `Modelo: ${model}` : '',
+    ...(conv.cart?.length
+      ? [`Pedido: ${cartText(conv.cart)}`]
+      : [f.cantidad ? `Cantidad: ${f.cantidad}` : '', model ? `Modelo: ${model}` : '']),
     f.formaPago ? `Quiere pagar con ${f.formaPago}` : '',
-    f.disponibilidad ? AVAIL_LABEL[f.disponibilidad] : '',
+    f.disponibilidad && !multi ? AVAIL_LABEL[f.disponibilidad] : '',
   ].filter(Boolean);
   return parts.join('. ') + '.';
 }
@@ -82,6 +89,20 @@ export function processIncoming(ctx: EngineContext, input: EngineInput): EngineR
   const flow = ctx.flow ?? DEFAULT_FLOW;
   const run = new Run(ctx, flow);
   run.handle(input);
+  return run.result();
+}
+
+/**
+ * El cliente eligió productos pero no contestó "¿te interesa otro producto?": pasado el tiempo de espera,
+ * pasa al asesor con lo que lleva (a quien ya eligió nunca se le deja esperando). null = todavía no.
+ */
+export function cartTimeout(ctx: EngineContext): EngineResult | null {
+  const c = ctx.conv;
+  const flow = ctx.flow ?? DEFAULT_FLOW;
+  const wait = (flow.cartWaitMinutes ?? 15) * MINUTE;
+  if (!c.botActive || c.bot.nodeId !== CART_NODE || !c.bot.awaitingSince || ctx.now - c.bot.awaitingSince < wait) return null;
+  const run = new Run(ctx, flow);
+  run.closeCart();
   return run.result();
 }
 
@@ -138,6 +159,7 @@ class Run {
       assignedTo: c.assignedTo ?? null,
       name: c.name,
       value: c.value,
+      ...(c.cart ? { cart: c.cart } : {}),
     };
     return { replies: this.replies, patch, tasks: this.tasks, notes: this.notes };
   }
@@ -148,6 +170,9 @@ class Run {
     const norm = normalize(text);
 
     c.bot.inboundCount = (c.bot.inboundCount ?? 0) + 1;
+    // Un asesor le devolvió la conversación: solo cuenta para este primer mensaje.
+    const resumed = !!c.bot.resumed;
+    c.bot.resumed = undefined;
     const hadSeenProducts = c.bot.shownProductIds.length > 0 || c.bot.lastProductIds.length > 0;
     // Respondió: se reinicia el seguimiento.
     c.bot.awaitingSince = undefined;
@@ -191,12 +216,15 @@ class Run {
       }
     }
 
-    // 3) Disparadores que pasan al asesor sin esperar.
+    // 3) Esperando "¿te interesa otro producto?". Soporte, pagos o "hablar con alguien" siguen su camino.
+    if (c.bot.nodeId === CART_NODE && (!trig || trig.intent === 'compra' || trig.intent === 'precio')) return this.handleCart(input, text, norm);
+
+    // 4) Disparadores que pasan al asesor sin esperar.
     if (trig) {
       const mentionedNow = detectProducts(text, this.ctx.products);
       // "Quiero comprar un producto" sin decir cuál: primero le preguntamos qué busca y le mostramos el listado.
       // Todavía no suma puntos de compra ni cambia de etapa: no sabemos qué quiere.
-      if ((trig.intent === 'compra' || trig.intent === 'precio') && !mentionedNow.length && !c.fields.categoria && !c.bot.lastProductIds.length) {
+      if ((trig.intent === 'compra' || trig.intent === 'precio') && !mentionedNow.length && !c.fields.categoria && !c.bot.lastProductIds.length && !c.cart?.length) {
         const catNode = this.flow.nodes.find((n) => n.field === 'categoria' && n.kind === 'question');
         if (catNode) {
           this.scoreDelta += 5;
@@ -251,7 +279,7 @@ class Run {
       }
     }
 
-    // 4) Primer mensaje: saludo (y si ya pregunta por un producto, se lo mostramos).
+    // 5) Primer mensaje: saludo (y si ya pregunta por un producto, se lo mostramos).
     if (!c.bot.nodeId) {
       const mentioned = detectProducts(text, this.ctx.products);
       const start = this.node(this.flow.startNode);
@@ -266,7 +294,7 @@ class Run {
       return;
     }
 
-    // 5) Esperando elección de las fichas.
+    // 6) Esperando elección de las fichas.
     if (node.kind === 'recommend') {
       const mentioned = detectProducts(text, this.ctx.products);
       // "Me gusta la Vigor": un modelo concreto → su ficha con "Lo quiero" (no otro carrusel).
@@ -286,14 +314,16 @@ class Run {
       }
       if (/\b(otra|otras|mas opciones|más opciones|ver mas)\b/.test(norm)) return this.showOthers();
       if (/\b(ninguna|no me gusta|no gracias|no me interesa)\b/.test(norm)) return this.noneLiked();
+      // Volvió a escribir después de hablar con el asesor ("hola", "gracias"): le ofrecemos otros productos.
+      if (resumed) return this.startAnother(this.flow.messages.welcomeBack || '¡Hola de nuevo! 😊 Sigo aquí para ayudarte. ¿Qué otro producto te gustaría ver?');
       return this.notUnderstood(node);
     }
 
-    // 6) Responder la pregunta actual.
+    // 7) Responder la pregunta actual.
     const answered = this.answer(node, input, text);
     if (answered) return;
 
-    // 7) No contestó la pregunta pero mencionó un producto: lo mostramos y seguimos.
+    // 8) No contestó la pregunta pero mencionó un producto: lo mostramos y seguimos.
     const mentioned = detectProducts(text, this.ctx.products);
     if (mentioned.length) {
       this.showMentioned(mentioned);
@@ -416,6 +446,15 @@ class Run {
         this.handoff('No sabe qué necesita');
         return true;
       }
+      // "¿Tienen mancuernas?" responde también la pregunta siguiente (qué tipo de peso libre): no se la hacemos.
+      const after = !input.buttonId ? this.node(next) : undefined;
+      if (after?.kind === 'question' && after.parse === 'choice' && after.field && after.field !== 'nombre_ciudad' && !this.fieldFilled(after)) {
+        const opt2 = this.matchOption(this.optionsOf(after), input, norm);
+        if (opt2 && opt2.value !== 'no-sabe') {
+          (c.fields as Record<string, unknown>)[after.field] = opt2.value;
+          next = opt2.next ?? after.next;
+        }
+      }
     } else if (node.parse === 'number') {
       const m = text.replace(',', '.').match(/\d+(\.\d+)?/);
       if (!m) return false;
@@ -438,10 +477,16 @@ class Run {
       if (node.field && node.field !== 'nombre_ciudad') (c.fields as Record<string, unknown>)[node.field] = text.trim();
     }
     this.scoreDelta += 3;
-    // La cantidad cambia el valor estimado del negocio.
-    if (node.field === 'cantidad' && c.fields.modeloInteres) {
-      const p = this.ctx.products.find((x) => x.name === c.fields.modeloInteres);
-      if (p) c.value = p.price * (parseInt(String(c.fields.cantidad), 10) || 1);
+    // La cantidad es del producto del pedido que la estaba esperando (o del próximo que elija).
+    if (node.field === 'cantidad') {
+      const waiting = c.cart?.find((i) => !i.qty);
+      c.bot.qtyUsed = !!waiting;
+      if (waiting) waiting.qty = String(c.fields.cantidad);
+      if (c.cart?.length) c.value = cartValue(c.cart);
+      else if (c.fields.modeloInteres) {
+        const p = this.ctx.products.find((x) => x.name === c.fields.modeloInteres);
+        if (p) c.value = p.price * (parseInt(String(c.fields.cantidad), 10) || 1);
+      }
     }
     // Faltaban datos para pasar al asesor: se sigue pidiendo lo que falte o se hace el traspaso.
     if (c.bot.pendingHandoff) {
@@ -563,7 +608,7 @@ class Run {
     const miss = this.missing();
     if (miss) return this.askRequired(miss, intro);
     if (intro) this.say(intro);
-    this.handoff(pending.reason, pending.intent);
+    this.handoff(pending.reason, pending.intent, false, pending.offerMore);
   }
 
   /** Opciones de una pregunta: escritas a mano o tomadas de las categorías del catálogo. */
@@ -680,17 +725,13 @@ class Run {
     if (id.startsWith(BTN.select)) {
       const p = this.ctx.products.find((x) => x.id === id.slice(BTN.select.length));
       if (!p) return false;
-      c.fields.modeloInteres = p.name;
-      c.fields.disponibilidad = p.availability;
-      if (!c.fields.categoria) c.fields.categoria = p.category;
-      if (!c.fields.subcategoria) c.fields.subcategoria = p.subcategory;
-      c.value = p.price * (parseInt(c.fields.cantidad ?? '1', 10) || 1);
-      c.bot.lastProductIds = [p.id];
+      this.addToCart(p);
       this.scoreDelta += 25;
       this.scoreFloor = this.ctx.settings.hotThreshold || 70;
       this.setIntent('compra', `Eligió ${p.name}`, [p.id]);
       if (p.availability === 'agotado' && !c.tags.includes('agotado')) c.tags.push('agotado');
-      this.handoff(`Eligió ${p.name}`, 'compra', true);
+      const reason = c.cart!.length > 1 ? `Pedido de ${c.cart!.length} productos` : `Eligió ${p.name}`;
+      this.handoff(reason, 'compra', true, true);
       return true;
     }
     if (id === BTN.more) {
@@ -708,6 +749,7 @@ class Run {
   private resume(): void {
     const c = this.conv;
     const back = this.flow.messages.backToFlow || 'Ahora sí, sigamos 😊';
+    if (c.bot.nodeId === CART_NODE) return this.askMore(c.bot.pendingHandoff?.reason ?? 'Pedido listo', back);
     const node = this.node(c.bot.nodeId);
     if (!c.bot.nodeId || !node) {
       const start = this.walk(this.flow.startNode);
@@ -741,20 +783,113 @@ class Run {
     c.bot.retries = retries;
   }
 
+  // -------------------------------------------------------------------------
+  // Pedido con varios productos
+  // -------------------------------------------------------------------------
+
+  /** "Lo quiero": agrega el producto al pedido (sin borrar lo que ya eligió). */
+  private addToCart(p: Product): void {
+    const c = this.conv;
+    const cart = c.cart ?? [];
+    if (!cart.some((i) => i.productId === p.id)) {
+      // La cantidad que ya dijo vale para este producto solo si no se usó en otro: si no, se le vuelve a preguntar.
+      const qty = c.fields.cantidad && !c.bot.qtyUsed ? String(c.fields.cantidad) : '';
+      if (qty) c.bot.qtyUsed = true;
+      else delete c.fields.cantidad;
+      cart.push({ productId: p.id, name: p.name, price: p.price, qty });
+    }
+    c.cart = cart;
+    c.fields.modeloInteres = p.name;
+    c.fields.disponibilidad = p.availability;
+    if (!c.fields.categoria) c.fields.categoria = p.category;
+    if (!c.fields.subcategoria) c.fields.subcategoria = p.subcategory;
+    c.value = cartValue(cart);
+    c.bot.lastProductIds = [p.id];
+  }
+
+  /** "¡Listo! Tu pedido: … ¿Te interesa alguno de nuestros otros productos?" */
+  private askMore(reason: string, intro?: string): void {
+    const c = this.conv;
+    c.bot.pendingHandoff = { reason, intent: 'compra' };
+    c.bot.nodeId = CART_NODE;
+    c.bot.retries = 0;
+    c.bot.awaitingSince = this.ctx.now;
+    const pedido = '• ' + cartText(c.cart ?? [], '\n• ');
+    const text = (this.flow.messages.askMore || '¡Listo! 🛒 Tu pedido va así:\n{pedido}\n\n¿Te interesa alguno de nuestros otros productos?').replace(/\{pedido\}/g, pedido);
+    this.replies.push({
+      type: 'buttons',
+      text: this.fill(intro ? `${intro}\n${text}` : text),
+      buttons: [
+        { id: BTN.cartMore, title: 'Sí, ver otros' },
+        { id: BTN.cartDone, title: 'No, es todo' },
+      ],
+    });
+  }
+
+  /** Respuesta a "¿te interesa alguno de nuestros otros productos?". */
+  private handleCart(input: EngineInput, text: string, norm: string): void {
+    const c = this.conv;
+    const reason = c.bot.pendingHandoff?.reason ?? 'Pedido listo';
+    // "También quiero unas mancuernas": se las mostramos de una vez.
+    const mentioned = input.buttonId ? [] : detectProducts(text, this.ctx.products).filter((p) => !c.cart?.some((i) => i.productId === p.id));
+    if (mentioned.length) {
+      this.resetInterest();
+      this.showMentioned(mentioned);
+      this.say('Toca *Lo quiero* en la que quieras agregar a tu pedido 😊');
+      c.bot.nodeId = 'recomendar';
+      c.bot.awaitingSince = this.ctx.now;
+      return;
+    }
+    const done = input.buttonId === BTN.cartDone || (!input.buttonId && /\b(no|nada|es todo|eso es todo|listo|solo eso|asi esta bien|ya)\b/.test(norm));
+    const more = input.buttonId === BTN.cartMore || (!input.buttonId && /\b(si|claro|dale|otro|otra|otros|otras|agregar|anadir|sumar|tambien|mas|ver)\b/.test(norm));
+    if (more && !done) return this.startAnother();
+    // "No, es todo" o cualquier otra respuesta: quien ya eligió no se queda esperando.
+    this.handoff(reason, 'compra');
+  }
+
+  /** Le interesan otros productos: vuelve a preguntar qué busca (conserva sus datos y el pedido). */
+  private startAnother(message?: string): void {
+    const c = this.conv;
+    this.resetInterest();
+    const msg = message ?? (this.flow.messages.addAnother || '¡Claro! 😊 ¿Qué otro producto te gustaría ver?');
+    const catNode = this.flow.nodes.find((n) => n.field === 'categoria' && n.kind === 'question');
+    if (catNode) return this.ask(catNode, undefined, msg);
+    this.say(msg);
+    c.bot.nodeId = 'recomendar';
+    c.bot.awaitingSince = this.ctx.now;
+  }
+
+  /** Olvida el producto que estaba buscando (no el pedido) para buscar otro. */
+  private resetInterest(): void {
+    const c = this.conv;
+    delete c.fields.categoria;
+    delete c.fields.subcategoria;
+    c.bot.shownProductIds = [];
+    c.bot.lastProductIds = [];
+    c.bot.pendingHandoff = null;
+  }
+
+  /** Tiempo de espera vencido en "¿otro producto?": pasa al asesor con el pedido. */
+  closeCart(): void {
+    this.handoff(this.conv.bot.pendingHandoff?.reason ?? 'Pedido listo', 'compra');
+  }
+
   /**
    * Pasa la conversación a un asesor. Si es una venta (`requireData`), primero se asegura de tener los datos
    * obligatorios: si falta alguno lo pide y deja el traspaso en espera hasta completarlos.
    * Soporte, pagos, "quiero hablar con alguien" y "no entendí" pasan siempre de inmediato.
    */
-  private handoff(reason: string, intent?: IntentType, requireData = false): void {
+  private handoff(reason: string, intent?: IntentType, requireData = false, offerMore = false): void {
     const c = this.conv;
     if (requireData) {
       const miss = this.missing();
       if (miss) {
-        c.bot.pendingHandoff = { reason, intent };
+        c.bot.pendingHandoff = { reason, intent, ...(offerMore ? { offerMore } : {}) };
         return this.askRequired(miss);
       }
     }
+    // Acaba de elegir un producto: antes de pasar al asesor, ¿le interesa alguno de los otros productos?
+    if (offerMore && c.cart?.length && this.flow.askMoreProducts !== false) return this.askMore(reason);
     c.bot.pendingHandoff = null;
     const s = this.ctx.settings;
     const open = isOpen(s, this.ctx.now);

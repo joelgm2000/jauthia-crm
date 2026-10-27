@@ -1,5 +1,5 @@
 /** Catálogo en el chat: recomendación, tarjetas del carrusel, ficha técnica y detección de productos. */
-import { Availability, ChatMessage, Conversation, Product, ProductCard } from './models';
+import { Availability, CartItem, ChatMessage, Conversation, Product, ProductCard } from './models';
 import { includesWord, normalize } from './text';
 
 /** Mensaje saliente antes de guardarse (sin id, conversación ni fecha). */
@@ -11,7 +11,19 @@ export const BTN = {
   select: 'sel_',
   more: 'more_options',
   none: 'none_liked',
+  cartDone: 'cart_done',
+  cartMore: 'cart_more',
 } as const;
+
+/** Valor estimado del pedido ("2-3" cuenta como 2, "4+" como 4; sin cantidad, 1). */
+export function cartValue(cart: CartItem[]): number {
+  return cart.reduce((sum, i) => sum + i.price * (parseInt(i.qty, 10) || 1), 0);
+}
+
+/** "2-3 × Evo Latte, 1 × Mancuernas" */
+export function cartText(cart: CartItem[], sep = ', '): string {
+  return cart.map((i) => `${i.qty || '1'} × ${i.name}`).join(sep);
+}
 
 export const AVAIL_LABEL: Record<Availability, string> = {
   tienda: 'Disponible en tienda (entrega inmediata)',

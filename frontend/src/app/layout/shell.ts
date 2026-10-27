@@ -12,7 +12,7 @@ interface NavItem {
   badge?: () => number;
   badgeKind?: 'hot' | 'normal';
   /** Módulo que debe tener contratado el cliente. */
-  module?: 'crm' | 'chatbot';
+  module?: 'crm' | 'chatbot' | 'market';
   /** Solo para administradores del cliente. */
   admin?: boolean;
 }
@@ -132,6 +132,7 @@ export class Shell {
     { path: '/templates', label: 'Plantillas WhatsApp', icon: 'template' },
     { path: '/flow', label: 'Flujo del bot', icon: 'flow', module: 'chatbot', admin: true },
     { path: '/automation', label: 'Remarketing y alertas', icon: 'sparkles', module: 'chatbot', admin: true },
+    { path: '/market', label: 'Inteligencia de mercado', icon: 'target', module: 'market' },
     { path: '/channels', label: 'Canales', icon: 'plug', admin: true },
     { path: '/settings', label: 'Configuración', icon: 'settings', admin: true },
   ];

@@ -37,3 +37,5 @@
 .req-actions { display: flex; flex-direction: column; gap: 4px; }
 .mono-prompt { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; line-height: 1.5; }
 .card + .card { margin-top: 16px; }
+
+.sub-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; justify-content: space-between; padding-top: 6px; border-top: 1px solid var(--line); font-size: 13px; }

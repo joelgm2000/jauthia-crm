@@ -17,6 +17,23 @@ export const emailSchema = z.string().email().max(200);
 export const id = z.string().min(1).max(120).regex(/^[\w-]+$/, 'id inválido');
 export const short = (n = 200) => z.string().max(n);
 export const url = z.string().max(1000).refine((u) => u === '' || u.startsWith('/') || /^https:\/\//.test(u), 'La URL debe ser https:// o una ruta del sitio');
+
+/** Web o red social: dirección http(s) o "@usuario". */
+const webRef = short(300).refine((u) => u === '' || /^@?[\w.-]{2,60}$/.test(u) || /^https?:\/\/[^\s]+$/.test(u), 'Usa una dirección https://… o @usuario').optional();
+
+/** Perfil del negocio para la inteligencia de mercado. */
+export const businessProfile = z.object({
+  description: short(2000),
+  industry: short(150),
+  zone: short(200),
+  website: webRef,
+  instagram: webRef,
+  facebook: webRef,
+  tiktok: webRef,
+  idealCustomer: short(600),
+  differentiators: short(1000).optional(),
+  competitors: z.array(z.object({ name: short(120).min(1), url: webRef })).max(10),
+});
 const channelType = z.enum(Object.keys(CHANNEL_LABELS) as [ChannelType, ...ChannelType[]]);
 const stageId = z.enum(STAGES.map((s) => s.id) as [StageId, ...StageId[]]);
 const button = z.object({ id: short(64), title: short(40), description: short(100).optional() });
@@ -128,6 +145,8 @@ const flow = z.object({
     key: z.enum(['nombre', 'producto', ...EDITABLE_FIELDS]), label: short(60).min(1), when: z.enum(['inicio', 'antes_asesor']), nodeId: short(64).optional(),
   })).max(15).optional(),
   messages: z.record(z.string().max(40), short(1024)),
+  askMoreProducts: z.boolean().optional(),
+  cartWaitMinutes: z.number().int().min(5).max(24 * 60).optional(),
 });
 
 export const tenantRole = z.enum(TENANT_ROLES);
