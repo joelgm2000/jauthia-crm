@@ -137,7 +137,7 @@ function profileText(t: Tenant, p: BusinessProfile, products: Product[]): string
     p.tiktok && `TikTok: ${p.tiktok}`,
     p.idealCustomer && `Cliente ideal: ${p.idealCustomer}`,
     p.differentiators && `Diferenciales: ${p.differentiators}`,
-    p.competitors.length && `Competidores conocidos: ${p.competitors.map((c) => (c.url ? `${c.name} (${c.url})` : c.name)).join('; ')}`,
+    p.competitors.length && `Competidores que el cliente ya conoce (opcional, busca también otros): ${p.competitors.map((c) => (c.url ? `${c.name} (${c.url})` : c.name)).join('; ')}`,
     catalog.length && `Algunos productos de su catálogo: ${catalog.join(', ')}`,
   ].filter(Boolean).join('\n');
 }
@@ -158,7 +158,7 @@ PERFIL DEL NEGOCIO
 ${profile}${extra}
 
 Tarea:
-1. Investiga a los competidores conocidos. Si son menos de 3, busca los principales competidores del mismo nicho en su zona (y tiendas en línea que vendan allí) hasta tener entre 3 y 6.
+1. Busca tú mismo en Google los principales competidores: negocios del mismo nicho en su zona (búscalos por ciudad, en Google Maps, Instagram y Facebook) y tiendas en línea que vendan allí. Elige entre 4 y 6, los más relevantes por tamaño, reseñas y presencia en redes. Si el perfil menciona competidores conocidos, inclúyelos también.
 2. Para cada uno: qué ofrecen y a quién, fortalezas, debilidades (precio, atención, tiempos, contenido, reseñas, catálogo, canales) y dónde están presentes y cómo comunican.
 3. Da entre 5 y 8 oportunidades concretas: segmentos, productos, servicios, canales o mensajes que la competencia NO está cubriendo bien y que esta empresa puede aprovechar. Cada una con por qué y una acción para esta semana.
 

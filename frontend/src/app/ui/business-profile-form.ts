@@ -28,7 +28,7 @@ import { Icon } from './icon';
       <div class="field"><label>TikTok</label><input class="input" maxlength="300" [(ngModel)]="p.tiktok" (ngModelChange)="changed.emit()" placeholder="@usuario" /></div>
     </div>
     <div class="field">
-      <label>Competidores <small class="muted">Nombre y su web o red social. Si no los sabes, la IA los busca.</small></label>
+      <label>Competidores que ya conoces (opcional) <small class="muted">No hace falta: la IA busca en Google los competidores de tu nicho en tu zona. Si conoces alguno, agrégalo para que lo incluya.</small></label>
       @for (c of p.competitors; track $index) {
         <div class="comp">
           <input class="input" maxlength="120" [(ngModel)]="c.name" (ngModelChange)="changed.emit()" placeholder="Nombre" />
