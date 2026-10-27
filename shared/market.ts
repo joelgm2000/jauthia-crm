@@ -3,14 +3,17 @@
  *  - Competencia: qué hace cada competidor, sus fortalezas y debilidades, y dónde enfocarse que ellos no.
  *  - Guiones: ideas de videos y publicaciones para el nicho, con gancho, escenas y llamado a la acción.
  *  - Clientes potenciales: negocios reales que podrían comprarle, con sus datos públicos y un mensaje de primer contacto.
+ *  - Redes sociales: auditoría de sus redes con puntajes, recomendaciones de grandes referentes del marketing,
+ *    pilares de contenido y un plan de 30 días.
  * La IA investiga en internet (búsqueda de Google) a partir del perfil del negocio.
  */
 
-export const MARKET_KINDS = ['competencia', 'guiones', 'clientes'] as const;
+export const MARKET_KINDS = ['competencia', 'redes', 'guiones', 'clientes'] as const;
 export type MarketKind = (typeof MARKET_KINDS)[number];
 
 export const MARKET_KIND_LABEL: Record<MarketKind, string> = {
   competencia: 'Competencia y oportunidades',
+  redes: 'Análisis de redes sociales',
   guiones: 'Ideas de guiones',
   clientes: 'Clientes potenciales',
 };
@@ -65,7 +68,26 @@ export interface CompetitorInsight {
   weaknesses: string[];
   /** Dónde están presentes (Instagram, TikTok, web, Google Maps…) y cómo comunican. */
   presence: string;
+  /** Qué hace para atraer clientes (anuncios, promociones, sorteos, reseñas, colaboraciones…). */
+  tactics?: string[];
+  /** Sus publicaciones o videos que mejor funcionaron (con las cifras públicas que se vieron). */
+  topContent?: TopContent[];
 }
+
+/** Video o publicación destacada de un competidor. Las cifras son las públicas que se encontraron (texto, ej. "12 mil"). */
+export interface TopContent {
+  title: string;
+  network: string;
+  url?: string;
+  views?: string;
+  likes?: string;
+  comments?: string;
+  /** Por qué funcionó y cómo adaptarlo. */
+  why: string;
+}
+
+export const LEVELS = ['alto', 'medio', 'bajo'] as const;
+export type Level = (typeof LEVELS)[number];
 
 /** Algo que la competencia no está haciendo bien y el cliente puede aprovechar. */
 export interface Opportunity {
@@ -73,6 +95,63 @@ export interface Opportunity {
   why: string;
   /** Acción concreta para esta semana. */
   action: string;
+  /** Qué tanto puede mover las ventas. */
+  impact?: Level;
+  /** Qué tanto trabajo cuesta. */
+  effort?: Level;
+}
+
+/** Comparación en un aspecto (precio, contenido, atención…): puntaje de 1 a 10 del cliente y de cada competidor. */
+export interface Comparison {
+  dimension: string;
+  scores: { name: string; score: number }[];
+}
+
+/** Auditoría de una red social del cliente. */
+export interface SocialChannelAudit {
+  /** Instagram, TikTok, Facebook, sitio web, Google (perfil de empresa)… */
+  network: string;
+  url?: string;
+  /** ¿Se encontró la cuenta? */
+  found: boolean;
+  /** Puntaje estimado de 0 a 100. */
+  score: number;
+  /** Seguidores u otro dato público (texto tal como se encontró). */
+  audience?: string;
+  /** Frecuencia de publicación observada. */
+  frequency?: string;
+  strengths: string[];
+  weaknesses: string[];
+  /** Lo primero que debe cambiar en esta red. */
+  quickWin: string;
+}
+
+/** Recomendación basada en un referente del marketing (principio parafraseado, no cita textual). */
+export interface ExpertTip {
+  expert: string;
+  principle: string;
+  /** Cómo aplicarlo en este negocio. */
+  apply: string;
+}
+
+/** Pilar de contenido: tema recurrente y qué parte de las publicaciones ocupa. */
+export interface ContentPillar {
+  name: string;
+  /** Porcentaje de las publicaciones (los pilares suman 100). */
+  share: number;
+  ideas: string[];
+}
+
+export interface PlanWeek {
+  week: string;
+  focus: string;
+  actions: string[];
+}
+
+export interface Kpi {
+  name: string;
+  /** Meta a 30 días. */
+  target: string;
 }
 
 export interface ScriptIdea {
@@ -116,6 +195,14 @@ export interface MarketReport {
   summary: string;
   competitors?: CompetitorInsight[];
   opportunities?: Opportunity[];
+  comparison?: Comparison[];
+  /** Redes sociales: puntaje general (0 a 100). */
+  socialScore?: number;
+  channels?: SocialChannelAudit[];
+  tips?: ExpertTip[];
+  pillars?: ContentPillar[];
+  plan?: PlanWeek[];
+  kpis?: Kpi[];
   scripts?: ScriptIdea[];
   leads?: Lead[];
   /** Páginas que consultó la IA. */

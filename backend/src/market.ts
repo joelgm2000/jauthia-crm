@@ -3,7 +3,7 @@
  *
  *   GET  /api/market            perfil del negocio y análisis guardados
  *   PUT  /api/market/profile    guarda el perfil del negocio (administradores)
- *   POST /api/market/run        nuevo análisis { kind: competencia | guiones | clientes, request? } (administradores)
+ *   POST /api/market/run        nuevo análisis { kind: competencia | redes | guiones | clientes, request? } (administradores)
  *
  * La IA (Gemini con búsqueda de Google) investiga en internet a partir del perfil del negocio y devuelve JSON,
  * que aquí se valida y se limpia (solo enlaces http/https) antes de guardarlo. Usa la clave del cliente
@@ -14,7 +14,7 @@ import { NextFunction, Request, Response, Router } from 'express';
 import { z } from 'zod';
 import { canAdminTenant } from '../../shared/api';
 import { newId } from '../../shared/ids';
-import { BusinessProfile, EMPTY_PROFILE, MARKET_KINDS, MarketData, MarketKind, MarketReport, MarketSource, profileMissing } from '../../shared/market';
+import { BusinessProfile, EMPTY_PROFILE, Level, LEVELS, MARKET_KINDS, MarketData, MarketKind, MarketReport, MarketSource, profileMissing } from '../../shared/market';
 import { Product, Tenant } from '../../shared/models';
 import { DAY } from '../../shared/time';
 import { ApiError, getTenant } from './auth';
@@ -70,10 +70,33 @@ function safeUrl(u: unknown, igHandle = false): string | undefined {
 const text = (n: number) => z.string().trim().max(n * 2).transform((s) => s.slice(0, n)).catch('');
 const list = (n: number, item = 400) => z.array(text(item)).catch([]).transform((a) => a.filter(Boolean).slice(0, n));
 
+const aiTopContent = z.array(z.object({
+  title: text(200), network: text(40), url: z.unknown().optional(), views: text(30), likes: text(30), comments: text(30), why: text(500),
+}).catch({ title: '', network: '', views: '', likes: '', comments: '', why: '' })).catch([]);
 const aiCompetitors = z.array(z.object({
   name: text(120), url: z.unknown().optional(), offer: text(800), strengths: list(6), weaknesses: list(6), presence: text(600),
-}).catch({ name: '', offer: '', strengths: [], weaknesses: [], presence: '' })).catch([]);
-const aiOpportunities = z.array(z.object({ title: text(160), why: text(800), action: text(600) }).catch({ title: '', why: '', action: '' })).catch([]);
+  tactics: list(6), topContent: aiTopContent.optional(),
+}).catch({ name: '', offer: '', strengths: [], weaknesses: [], presence: '', tactics: [], topContent: [] })).catch([]);
+
+/** Cifra pública ("12,5 mil", "3.4K", "850"): solo dígitos, separadores y unidades cortas. */
+const metric = (s: string) => (/^[\d.,\s]+(?:\s?(?:k|m|mil|millones?|mill\.?))?\+?$/i.test(s.trim()) ? s.trim() : undefined);
+/** Puntaje entero entre min y max (lo que no es número queda en el mínimo). */
+const score = (min: number, max: number) => z.coerce.number().catch(min).transform((n) => Math.min(max, Math.max(min, Math.round(Number.isFinite(n) ? n : min))));
+const level = z.string().transform((s) => s.trim().toLowerCase()).pipe(z.enum(LEVELS)).optional().catch(undefined) as z.ZodType<Level | undefined, unknown>;
+
+const aiOpportunities = z.array(z.object({ title: text(160), why: text(800), action: text(600), impact: level, effort: level })
+  .catch({ title: '', why: '', action: '', impact: undefined, effort: undefined })).catch([]);
+const aiComparison = z.array(z.object({
+  dimension: text(60), scores: z.array(z.object({ name: text(80), score: score(1, 10) }).catch({ name: '', score: 1 })).catch([]),
+}).catch({ dimension: '', scores: [] })).catch([]);
+const aiChannels = z.array(z.object({
+  network: text(40), url: z.unknown().optional(), found: z.coerce.boolean().catch(false), score: score(0, 100), audience: text(80), frequency: text(120),
+  strengths: list(5), weaknesses: list(5), quickWin: text(400),
+}).catch({ network: '', found: false, score: 0, audience: '', frequency: '', strengths: [], weaknesses: [], quickWin: '' })).catch([]);
+const aiTips = z.array(z.object({ expert: text(80), principle: text(300), apply: text(600) }).catch({ expert: '', principle: '', apply: '' })).catch([]);
+const aiPillars = z.array(z.object({ name: text(80), share: score(0, 100), ideas: list(5, 300) }).catch({ name: '', share: 0, ideas: [] })).catch([]);
+const aiPlan = z.array(z.object({ week: text(40), focus: text(200), actions: list(7, 300) }).catch({ week: '', focus: '', actions: [] })).catch([]);
+const aiKpis = z.array(z.object({ name: text(100), target: text(120) }).catch({ name: '', target: '' })).catch([]);
 const aiScripts = z.array(z.object({
   title: text(160), format: text(40), angle: text(60), hook: text(300), scenes: list(12, 500), cta: text(300),
 }).catch({ title: '', format: '', angle: '', hook: '', scenes: [], cta: '' })).catch([]);
@@ -88,6 +111,13 @@ const aiReport = z.object({
   opportunities: aiOpportunities.optional(),
   scripts: aiScripts.optional(),
   leads: aiLeads.optional(),
+  comparison: aiComparison.optional(),
+  socialScore: score(0, 100).optional(),
+  channels: aiChannels.optional(),
+  tips: aiTips.optional(),
+  pillars: aiPillars.optional(),
+  plan: aiPlan.optional(),
+  kpis: aiKpis.optional(),
 });
 
 /** Arma el análisis a partir del JSON de la IA (descarta lo vacío o mal formado). */
@@ -95,8 +125,27 @@ function toReport(kind: MarketKind, raw: unknown, base: Pick<MarketReport, 'by' 
   const p = aiReport.parse(raw && typeof raw === 'object' ? raw : {});
   const report: MarketReport = { id: newId('mk'), kind, createdAt: Date.now(), summary: p.summary, ...base };
   if (kind === 'competencia') {
-    report.competitors = (p.competitors ?? []).filter((c) => c.name).slice(0, 8).map((c) => ({ ...c, url: safeUrl(c.url) }));
+    report.competitors = (p.competitors ?? []).filter((c) => c.name).slice(0, 8).map((c) => ({
+      ...c, url: safeUrl(c.url),
+      topContent: (c.topContent ?? []).filter((t) => t.title).slice(0, 4).map((t) => ({
+        ...t, url: safeUrl(t.url), views: metric(t.views), likes: metric(t.likes), comments: metric(t.comments),
+      })),
+    }));
     report.opportunities = (p.opportunities ?? []).filter((o) => o.title).slice(0, 10);
+    report.comparison = (p.comparison ?? []).map((d) => ({ ...d, scores: d.scores.filter((s) => s.name).slice(0, 7) })).filter((d) => d.dimension && d.scores.length >= 2).slice(0, 8);
+  } else if (kind === 'redes') {
+    report.channels = (p.channels ?? []).filter((c) => c.network).slice(0, 6).map((c) => ({
+      ...c, url: safeUrl(c.url, true), audience: c.audience || undefined, frequency: c.frequency || undefined, score: c.found ? c.score : 0,
+    }));
+    const found = report.channels.filter((c) => c.found);
+    report.socialScore = p.socialScore ?? (found.length ? Math.round(found.reduce((a, c) => a + c.score, 0) / found.length) : 0);
+    report.tips = (p.tips ?? []).filter((t) => t.expert && t.principle).slice(0, 8);
+    // Los pilares se reparten para que sumen 100 %.
+    const pillars = (p.pillars ?? []).filter((x) => x.name).slice(0, 6);
+    const total = pillars.reduce((a, x) => a + x.share, 0);
+    report.pillars = pillars.map((x) => ({ ...x, share: total ? Math.round((x.share / total) * 100) : Math.round(100 / pillars.length) }));
+    report.plan = (p.plan ?? []).filter((w) => w.focus || w.actions.length).slice(0, 5);
+    report.kpis = (p.kpis ?? []).filter((k) => k.name).slice(0, 8);
   } else if (kind === 'guiones') {
     report.scripts = (p.scripts ?? []).filter((s) => s.title && s.hook).slice(0, 12);
   } else {
@@ -160,10 +209,29 @@ ${profile}${extra}
 Tarea:
 1. Busca tú mismo en Google los principales competidores: negocios del mismo nicho en su zona (búscalos por ciudad, en Google Maps, Instagram y Facebook) y tiendas en línea que vendan allí. Elige entre 4 y 6, los más relevantes por tamaño, reseñas y presencia en redes. Si el perfil menciona competidores conocidos, inclúyelos también.
 2. Para cada uno: qué ofrecen y a quién, fortalezas, debilidades (precio, atención, tiempos, contenido, reseñas, catálogo, canales) y dónde están presentes y cómo comunican.
-3. Da entre 5 y 8 oportunidades concretas: segmentos, productos, servicios, canales o mensajes que la competencia NO está cubriendo bien y que esta empresa puede aprovechar. Cada una con por qué y una acción para esta semana.
+   Revisa también qué hacen en Google y en redes para atraer clientes (anuncios, promociones, sorteos, reseñas en Google Maps, colaboraciones con influenciadores, contenido educativo) y busca sus videos o publicaciones que mejor han funcionado (TikTok, Reels, YouTube, Facebook): título o tema, red, enlace, y las visitas, me gusta y comentarios SOLO si las ves publicadas en los resultados (si no, déjalos vacíos), con por qué funcionó y cómo adaptarlo a esta empresa.
+3. Da entre 5 y 8 oportunidades concretas: segmentos, productos, servicios, canales o mensajes que la competencia NO está cubriendo bien y que esta empresa puede aprovechar. Cada una con por qué, una acción para esta semana, su impacto en ventas y el esfuerzo que cuesta (alto, medio o bajo).
+4. Compara a esta empresa ("Tu negocio") con cada competidor en 5 aspectos (precio, contenido en redes, atención y respuesta, variedad del catálogo, reputación y reseñas), con un puntaje de 1 a 10 según lo que encontraste.
 
 ${RULES}
-{"summary": "resumen de 3 a 5 frases", "competitors": [{"name": "", "url": "", "offer": "", "strengths": [""], "weaknesses": [""], "presence": ""}], "opportunities": [{"title": "", "why": "", "action": ""}]}`;
+{"summary": "resumen de 3 a 5 frases", "competitors": [{"name": "", "url": "", "offer": "", "strengths": [""], "weaknesses": [""], "presence": "", "tactics": [""], "topContent": [{"title": "", "network": "TikTok", "url": "", "views": "", "likes": "", "comments": "", "why": ""}]}], "opportunities": [{"title": "", "why": "", "action": "", "impact": "alto", "effort": "bajo"}], "comparison": [{"dimension": "Precio", "scores": [{"name": "Tu negocio", "score": 7}, {"name": "Competidor", "score": 5}]}]}`;
+  }
+  if (kind === 'redes') {
+    return `Eres un consultor de marketing digital y redes sociales experto en negocios de Latinoamérica.
+
+PERFIL DEL NEGOCIO
+${profile}${opp}${extra}
+
+Tarea:
+1. Busca en Google las redes sociales y la presencia digital de ESTA empresa (Instagram, TikTok, Facebook, sitio web y perfil de empresa en Google Maps), usando los enlaces del perfil y su nombre y ciudad. Para cada una: si la encontraste, su enlace, el dato público de audiencia que veas (seguidores, reseñas), la frecuencia con la que publica, fortalezas, debilidades, la mejora más rápida y un puntaje de 0 a 100. Si no la encontraste, márcala como no encontrada (puntaje 0) y di por qué le conviene tenerla. No inventes seguidores ni datos: si no los ves, déjalos vacíos.
+2. Da un puntaje general de su presencia en redes de 0 a 100.
+3. Da 5 o 6 recomendaciones basadas en principios conocidos de grandes referentes del marketing y las redes (por ejemplo Gary Vaynerchuk, Alex Hormozi, Seth Godin, Neil Patel, Vilma Núñez, Russell Brunson, Donald Miller), elegidos según lo que más le sirva a este negocio. Parafrasea el principio (no inventes citas textuales) y explica cómo aplicarlo aquí, con un ejemplo concreto.
+4. Propón 3 a 5 pilares de contenido con el porcentaje de publicaciones de cada uno (suman 100) y 2 o 3 ideas por pilar.
+5. Arma un plan de 4 semanas (una entrada por semana) con el enfoque y 3 a 5 acciones concretas.
+6. Da 4 a 6 indicadores (KPI) con su meta a 30 días.
+
+${RULES}
+{"summary": "diagnóstico de 3 a 5 frases", "socialScore": 55, "channels": [{"network": "Instagram", "url": "", "found": true, "score": 60, "audience": "", "frequency": "", "strengths": [""], "weaknesses": [""], "quickWin": ""}], "tips": [{"expert": "", "principle": "", "apply": ""}], "pillars": [{"name": "", "share": 40, "ideas": [""]}], "plan": [{"week": "Semana 1", "focus": "", "actions": [""]}], "kpis": [{"name": "", "target": ""}]}`;
   }
   if (kind === 'guiones') {
     return `Eres un estratega de contenido y copywriter experto en redes sociales para negocios de Latinoamérica.
@@ -288,7 +356,12 @@ marketRouter.post('/run', async (req, res) => {
     const prompt = buildPrompt(p.data.kind, profileText(tenant, profile, products), request, p.data.kind === 'competencia' ? [] : lastOpp);
     const { json, sources } = await research(apiKey, prompt);
     const report = toReport(p.data.kind, json, { by: req.user!.name, request, sources });
-    const empty = p.data.kind === 'competencia' ? !report.competitors?.length && !report.opportunities?.length : p.data.kind === 'guiones' ? !report.scripts?.length : !report.leads?.length;
+    const empty = {
+      competencia: !report.competitors?.length && !report.opportunities?.length,
+      redes: !report.channels?.length && !report.tips?.length,
+      guiones: !report.scripts?.length,
+      clientes: !report.leads?.length,
+    }[p.data.kind];
     if (empty) throw new ApiError(502, 'La IA no encontró resultados. Revisa el perfil del negocio o intenta con otra indicación.');
     await saveReport(tenant.id, report);
     log.info('Análisis de mercado', { tenant: tenant.id, kind: p.data.kind, sources: sources.length });

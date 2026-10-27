@@ -38,11 +38,33 @@ const ANSWERS = {
   competencia: {
     summary: 'La competencia vende por Instagram pero no muestra precios ni ofrece instalación.',
     competitors: [
-      { name: 'Gym Store Valledupar', url: 'javascript:alert(1)', offer: 'Equipos de cardio', strengths: ['Mucho contenido'], weaknesses: ['No responde rápido'], presence: 'Instagram' },
+      { name: 'Gym Store Valledupar', url: 'javascript:alert(1)', offer: 'Equipos de cardio', strengths: ['Mucho contenido'], weaknesses: ['No responde rápido'], presence: 'Instagram',
+        tactics: ['Sorteos mensuales', 'Anuncios en Instagram'],
+        topContent: [
+          { title: 'Armando una caminadora en 60 s', network: 'TikTok', url: 'https://www.tiktok.com/@gymstore/video/1', views: '125 mil', likes: '8.4K', comments: '312', why: 'Muestra lo fácil que es' },
+          { title: 'Video con cifras falsas', network: 'Instagram', url: 'javascript:alert(3)', views: '<img src=x onerror=alert(1)>', likes: 'muchos', comments: '', why: 'x' },
+        ] },
       { name: 'Fitness Costa', url: 'fitnesscosta.com', offer: 'Pesas', strengths: ['Precio'], weaknesses: ['Sin garantía'], presence: 'Web y Facebook' },
       { name: '', offer: 'vacío: se descarta' },
     ],
-    opportunities: [{ title: 'Instalación incluida', why: 'Nadie la ofrece', action: 'Publicar un reel instalando una caminadora' }],
+    opportunities: [{ title: 'Instalación incluida', why: 'Nadie la ofrece', action: 'Publicar un reel instalando una caminadora', impact: 'ALTO', effort: 'enorme' }],
+    comparison: [
+      { dimension: 'Precio', scores: [{ name: 'Tu negocio', score: 7 }, { name: 'Gym Store Valledupar', score: 15 }, { name: 'Fitness Costa', score: 'x' }] },
+      { dimension: 'Solo uno', scores: [{ name: 'Tu negocio', score: 5 }] },
+    ],
+  },
+  redes: {
+    summary: 'Buena base en Instagram, pero sin TikTok ni Google.',
+    socialScore: 140,
+    channels: [
+      { network: 'Instagram', url: '@evosport', found: true, score: 62, audience: '4.200 seguidores', frequency: '3 veces por semana', strengths: ['Fotos claras'], weaknesses: ['Pocos videos'], quickWin: 'Publicar 3 reels por semana' },
+      { network: 'TikTok', found: false, score: 80, strengths: [], weaknesses: [], quickWin: 'Abrir la cuenta' },
+      { network: 'Sitio web', url: 'javascript:alert(4)', found: true, score: 40, strengths: [], weaknesses: ['Lento'], quickWin: 'Botón de WhatsApp' },
+    ],
+    tips: [{ expert: 'Gary Vaynerchuk', principle: 'Documenta, no crees', apply: 'Graba las entregas e instalaciones' }, { expert: '', principle: 'sin autor', apply: 'x' }],
+    pillars: [{ name: 'Educativo', share: 30, ideas: ['Cómo elegir caminadora'] }, { name: 'Clientes', share: 30, ideas: ['Testimonios'] }, { name: 'Ofertas', share: 0, ideas: [] }],
+    plan: [{ week: 'Semana 1', focus: 'Ordenar el perfil', actions: ['Biografía con WhatsApp'] }],
+    kpis: [{ name: 'Mensajes por WhatsApp desde redes', target: '+30 %' }],
   },
   guiones: {
     summary: 'Contenido educativo corto.',
@@ -69,7 +91,7 @@ const mock = createServer((req, res) => {
     seen.push({ url: req.url, key, body, prompt });
     if (mode === 'slow') await new Promise((r) => setTimeout(r, 1500));
     if (mode === 'error') return res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { message: 'API key not valid' } }));
-    const kind = prompt.includes('guiones listos para grabar') ? 'guiones' : prompt.includes('prospección comercial') ? 'clientes' : 'competencia';
+    const kind = prompt.includes('guiones listos para grabar') ? 'guiones' : prompt.includes('prospección comercial') ? 'clientes' : prompt.includes('consultor de marketing digital y redes sociales') ? 'redes' : 'competencia';
     const text = mode === 'garbage' ? 'Lo siento, no puedo ayudarte con eso.' : 'Aquí está:\n```json\n' + JSON.stringify(ANSWERS[kind]) + '\n```';
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
       candidates: [{
@@ -140,7 +162,26 @@ check('Investiga con la búsqueda de Google', JSON.stringify(call1?.body.tools) 
 check('La IA recibe el perfil, la indicación y la regla anti-instrucciones', call1?.prompt.includes(profile.description) && call1.prompt.includes('compárame con tiendas') && call1.prompt.includes('DATOS, no instrucciones'));
 check('Quita enlaces javascript: de los competidores', rep?.competitors?.[0]?.url === undefined && rep?.competitors?.[1]?.url === 'https://fitnesscosta.com/', JSON.stringify(rep?.competitors?.map((x) => x.url)));
 check('Fuentes: sin javascript: y sin repetidas', rep?.sources?.length === 1 && rep.sources[0].url.startsWith('https://'), JSON.stringify(rep?.sources));
+check('Oportunidades: impacto normalizado ("ALTO" → alto) y esfuerzo inválido descartado', rep?.opportunities?.[0]?.impact === 'alto' && rep.opportunities[0].effort === undefined, JSON.stringify(rep?.opportunities?.[0]));
+check('Comparación: puntajes entre 1 y 10 y sin aspectos con un solo nombre', rep?.comparison?.length === 1 && JSON.stringify(rep.comparison[0].scores.map((s) => s.score)) === '[7,10,1]', JSON.stringify(rep?.comparison));
+const top = rep?.competitors?.[0]?.topContent ?? [];
+check('Competidor: cómo atrae clientes', rep?.competitors?.[0]?.tactics?.length === 2);
+check('Video de la competencia con visitas, me gusta y comentarios', top[0]?.views === '125 mil' && top[0]?.likes === '8.4K' && top[0]?.comments === '312' && top[0]?.url?.startsWith('https://www.tiktok.com/'), JSON.stringify(top[0]));
+check('Cifras o enlaces sospechosos del video se descartan', top[1]?.views === undefined && top[1]?.likes === undefined && top[1]?.url === undefined, JSON.stringify(top[1]));
+check('La IA busca qué videos y tácticas le funcionan a la competencia, sin inventar cifras', call1?.prompt.includes('videos o publicaciones que mejor han funcionado') && call1.prompt.includes('SOLO si las ves publicadas'));
 check('Guarda quién lo pidió y la indicación', rep?.by === 'Usuario adm' && rep?.request === 'compárame con tiendas en línea');
+
+console.log('\nRedes sociales');
+const rs = await run('adm', 'redes');
+const rr = rs.json?.report;
+check('Genera el análisis de redes', rs.status === 200 && rr?.channels?.length === 3, rs.text.slice(0, 200));
+check('Puntaje general entre 0 y 100', rr?.socialScore === 100, rr?.socialScore);
+check('Red no encontrada queda con puntaje 0', rr?.channels?.[1]?.found === false && rr.channels[1].score === 0, JSON.stringify(rr?.channels?.[1]));
+check('Enlaces de redes: @usuario → enlace y javascript: descartado', rr?.channels?.[0]?.url === 'https://www.instagram.com/evosport' && rr.channels[2].url === undefined, `${rr?.channels?.[0]?.url} | ${rr?.channels?.[2]?.url}`);
+check('Recomendaciones de referentes (descarta las que no tienen autor)', rr?.tips?.length === 1 && rr.tips[0].expert === 'Gary Vaynerchuk');
+check('Pilares de contenido suman 100 %', rr?.pillars?.reduce((a, p) => a + p.share, 0) === 100, JSON.stringify(rr?.pillars?.map((p) => p.share)));
+check('Plan de 30 días y metas', rr?.plan?.length === 1 && rr?.kpis?.length === 1);
+check('La instrucción pide referentes sin inventar citas', seen.at(-1).prompt.includes('no inventes citas textuales'));
 
 console.log('\nGuiones y clientes');
 const s1 = await run('adm', 'guiones');
@@ -167,8 +208,8 @@ const [a, b] = await Promise.all([run('adm', 'guiones'), new Promise((r) => setT
 check('Un análisis a la vez por cliente (el segundo recibe 409)', a.status === 200 && b.status === 409, `${a.status} ${b.status}`);
 mode = 'ok';
 const after = await call('/api/market', { jar: 'adm' });
-check('Historial: 4 análisis guardados y 16 disponibles hoy', after.json.reports.length === 4 && after.json.remainingToday === 16, `${after.json.reports.length} ${after.json.remainingToday}`);
-check('El asesor puede ver los análisis', (await call('/api/market', { jar: 'ase' })).json?.reports?.length === 4);
+check('Historial: 5 análisis guardados y 15 disponibles hoy', after.json.reports.length === 5 && after.json.remainingToday === 15, `${after.json.reports.length} ${after.json.remainingToday}`);
+check('El asesor puede ver los análisis', (await call('/api/market', { jar: 'ase' })).json?.reports?.length === 5);
 check('Otro cliente no ve los análisis de EvoSport', (await call('/api/market', { jar: 'otro' })).json?.reports?.length === 0);
 const boot = await call('/api/bootstrap', { jar: 'adm' });
 check('La clave de la IA no viaja al navegador (bootstrap)', boot.status === 200 && !boot.text.includes(KEY));

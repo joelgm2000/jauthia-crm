@@ -1,11 +1,11 @@
 <div class="page" style="max-width:1120px">
-  <div class="page-head">
-    <div><h1>Inteligencia de mercado</h1><p>Tu competencia, ideas de contenido y clientes potenciales, investigados en internet con IA.</p></div>
+  <div class="page-head no-print">
+    <div><h1>Inteligencia de mercado</h1><p>Tu competencia, tus redes, ideas de contenido y clientes potenciales, investigados en internet con IA.</p></div>
     <span class="spacer"></span>
     @if (!loading()) { <span class="chip" title="Análisis que puedes pedir en las próximas 24 horas"><app-icon name="sparkles" [size]="13" /> {{ remaining() }} análisis disponibles hoy</span> }
   </div>
 
-  <div class="tabs">
+  <div class="tabs no-print">
     @for (t of tabs; track t.id) {
       <button [class.on]="tab() === t.id" (click)="tab.set(t.id)"><app-icon [name]="t.icon" [size]="15" /> {{ t.label }}</button>
     }
@@ -17,14 +17,14 @@
     @let t = tab();
     @if (isKind(t)) {
       @if (missing().length) {
-        <div class="banner warn">
+        <div class="banner warn no-print">
           <app-icon name="info" [size]="16" />
           <div>Para investigar, completa el perfil del negocio: falta {{ missing().join(', ') }}.</div>
           <button class="btn sm" (click)="tab.set('perfil')">Completar perfil</button>
         </div>
       }
 
-      <section class="card run">
+      <section class="card run no-print">
         <p class="muted">{{ hints[t].intro }}</p>
         @if (auth.isAdmin()) {
           <div class="run-row">
@@ -42,32 +42,72 @@
       </section>
 
       @if (current(t); as r) {
+        <!-- Encabezado que solo aparece en el PDF -->
+        <div class="print-head">
+          <img src="brand/isotipo.webp" alt="" />
+          <div><b>JAUTHIA</b><small>Inteligencia de mercado</small></div>
+          <span class="spacer"></span>
+          <div class="ph-right"><b>{{ auth.tenant()?.name }}</b><small>{{ when(r.createdAt, true) }}</small></div>
+        </div>
+
         <div class="report-head">
           <h2>{{ kindLabel[t] }}</h2>
           <span class="spacer"></span>
           @if (history(t).length > 1) {
-            <select class="select sm" [ngModel]="r.id" (ngModelChange)="select(t, $event)" title="Análisis anteriores">
+            <select class="select sm no-print" [ngModel]="r.id" (ngModelChange)="select(t, $event)" title="Análisis anteriores">
               @for (h of history(t); track h.id) { <option [value]="h.id">{{ when(h.createdAt) }}{{ h.request ? ' · ' + h.request.slice(0, 40) : '' }}</option> }
             </select>
           }
+          <button class="btn sm primary no-print" (click)="downloadPdf(r)" title="Descargar este análisis en PDF"><app-icon name="download" [size]="14" /> Descargar PDF</button>
         </div>
         <p class="meta muted">{{ when(r.createdAt, true) }} · por {{ r.by }}@if (r.request) { · "{{ r.request }}" }</p>
-        @if (r.summary) { <div class="card summary"><app-icon name="sparkles" [size]="16" /><p>{{ r.summary }}</p></div> }
+        @if (r.summary && t !== 'redes') { <div class="card summary"><app-icon name="sparkles" [size]="16" /><p>{{ r.summary }}</p></div> }
 
         <!-- ============ Competencia ============ -->
         @if (t === 'competencia') {
           @if (r.opportunities?.length) {
-            <h3 class="sec"><app-icon name="target" [size]="16" /> Dónde enfocarte que la competencia no</h3>
+            <div class="sec-row">
+              <h3 class="sec"><app-icon name="target" [size]="16" /> Dónde enfocarte que la competencia no</h3>
+              <span class="spacer"></span>
+              <div class="seg no-print">
+                <button [class.on]="oppFilter() === 'todas'" (click)="oppFilter.set('todas')">Todas</button>
+                <button [class.on]="oppFilter() === 'impacto'" (click)="oppFilter.set('impacto')">Mayor impacto</button>
+                <button [class.on]="oppFilter() === 'rapidas'" (click)="oppFilter.set('rapidas')">Más rápidas</button>
+              </div>
+            </div>
             <div class="opps">
-              @for (o of r.opportunities; track $index) {
+              @for (o of opportunities(r); track o.title) {
                 <div class="card opp">
+                  <div class="row wrap gap-6">
+                    @if (o.impact) { <span class="lvl" [class]="'lvl imp-' + o.impact">Impacto {{ levelLabel[o.impact] }}</span> }
+                    @if (o.effort) { <span class="lvl" [class]="'lvl eff-' + o.effort">Esfuerzo {{ levelLabel[o.effort] }}</span> }
+                  </div>
                   <b>{{ o.title }}</b>
                   <p>{{ o.why }}</p>
                   @if (o.action) { <p class="action"><app-icon name="check" [size]="13" /> {{ o.action }}</p> }
                 </div>
+              } @empty { <p class="muted">Ninguna oportunidad con ese filtro.</p> }
+            </div>
+          }
+
+          @if (r.comparison?.length) {
+            <h3 class="sec"><app-icon name="kanban" [size]="16" /> Tú frente a la competencia <small class="muted">(puntaje de 1 a 10)</small></h3>
+            <div class="card compare">
+              @for (d of r.comparison; track d.dimension) {
+                <div class="dim">
+                  <b>{{ d.dimension }}</b>
+                  @for (s of d.scores; track s.name) {
+                    <div class="bar-row" [class.you]="isYou(s.name)">
+                      <span class="who">{{ s.name }}</span>
+                      <span class="bar"><i [style.width.%]="pct(s.score)"></i></span>
+                      <span class="num">{{ s.score }}</span>
+                    </div>
+                  }
+                </div>
               }
             </div>
           }
+
           @if (r.competitors?.length) {
             <h3 class="sec"><app-icon name="trend" [size]="16" /> Competidores</h3>
             <div class="comps">
@@ -83,19 +123,144 @@
                     <div><small class="bad">Debilidades</small>@for (s of c.weaknesses; track $index) { <span>✗ {{ s }}</span> }</div>
                   </div>
                   @if (c.presence) { <p class="muted presence"><app-icon name="map" [size]="13" /> {{ c.presence }}</p> }
+                  @if (c.tactics?.length) {
+                    <div class="tactics"><small>Cómo atrae clientes</small>
+                      <div class="row wrap gap-6">@for (x of c.tactics; track $index) { <span class="chip soft">{{ x }}</span> }</div>
+                    </div>
+                  }
+                  @if (c.topContent?.length) {
+                    <div class="top"><small>Contenido que mejor le ha funcionado</small>
+                      @for (v of c.topContent; track $index) {
+                        <div class="video">
+                          <div class="v-head">
+                            <span class="net">{{ v.network }}</span>
+                            <b>{{ v.title }}</b>
+                            @if (v.url) { <a [href]="v.url" target="_blank" rel="noopener noreferrer nofollow" title="Ver"><app-icon name="play" [size]="13" /></a> }
+                          </div>
+                          @if (v.views || v.likes || v.comments) {
+                            <div class="metrics">
+                              @if (v.views) { <span>👁 {{ v.views }} visitas</span> }
+                              @if (v.likes) { <span>♥ {{ v.likes }}</span> }
+                              @if (v.comments) { <span>💬 {{ v.comments }}</span> }
+                            </div>
+                          } @else { <small class="muted">Cifras no públicas</small> }
+                          @if (v.why) { <p>{{ v.why }}</p> }
+                        </div>
+                      }
+                    </div>
+                  }
                 </div>
               }
             </div>
           }
         }
 
+        <!-- ============ Redes sociales ============ -->
+        @if (t === 'redes') {
+          <div class="card social-hero">
+            <app-score-ring [value]="r.socialScore ?? 0" [size]="120" label="de 100" />
+            <div>
+              <small class="muted">Puntaje de tus redes (estimado por la IA)</small>
+              <p>{{ r.summary }}</p>
+            </div>
+          </div>
+
+          @if (r.channels?.length) {
+            <h3 class="sec"><app-icon name="megaphone" [size]="16" /> Red por red</h3>
+            <div class="channels">
+              @for (ch of r.channels; track $index) {
+                <div class="card channel" [class.missing]="!ch.found">
+                  <div class="ch-head">
+                    <app-score-ring [value]="ch.score" [size]="64" />
+                    <div>
+                      <b>{{ ch.network }}</b>
+                      @if (!ch.found) { <span class="lvl imp-alto">No encontrada</span> }
+                      @if (ch.audience) { <small class="muted">{{ ch.audience }}</small> }
+                      @if (ch.frequency) { <small class="muted">Publica: {{ ch.frequency }}</small> }
+                    </div>
+                    @if (ch.url) { <a class="ext" [href]="ch.url" target="_blank" rel="noopener noreferrer nofollow" title="Abrir"><app-icon name="external" [size]="14" /></a> }
+                  </div>
+                  @if (ch.quickWin) { <p class="quick"><app-icon name="sparkles" [size]="13" /> {{ ch.quickWin }}</p> }
+                  @if (ch.strengths.length || ch.weaknesses.length) {
+                    <div class="sw">
+                      <div><small class="ok">Bien</small>@for (s of ch.strengths; track $index) { <span>✓ {{ s }}</span> }</div>
+                      <div><small class="bad">Mejorar</small>@for (s of ch.weaknesses; track $index) { <span>✗ {{ s }}</span> }</div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (r.tips?.length) {
+            <h3 class="sec"><app-icon name="sparkles" [size]="16" /> Lo que harían los grandes del marketing</h3>
+            <div class="tips">
+              @for (tip of r.tips; track $index) {
+                <div class="card tip">
+                  <span class="expert">{{ tip.expert }}</span>
+                  <b>{{ tip.principle }}</b>
+                  <p>{{ tip.apply }}</p>
+                </div>
+              }
+            </div>
+          }
+
+          @if (r.pillars?.length) {
+            <h3 class="sec"><app-icon name="list" [size]="16" /> Pilares de contenido</h3>
+            <div class="card pillars">
+              <div class="stack">
+                @for (p of r.pillars; track $index) {
+                  @if (p.share > 0) { <i [style.width.%]="p.share" [style.background]="pillarColors[$index % pillarColors.length]" [title]="p.name + ': ' + p.share + '%'">{{ p.share }}%</i> }
+                }
+              </div>
+              <div class="pillar-list">
+                @for (p of r.pillars; track $index) {
+                  <div class="pillar">
+                    <b><span class="dot" [style.background]="pillarColors[$index % pillarColors.length]"></span>{{ p.name }} <small class="muted">{{ p.share }}%</small></b>
+                    <ul>@for (x of p.ideas; track $index) { <li>{{ x }}</li> }</ul>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (r.plan?.length) {
+            <h3 class="sec"><app-icon name="tasks" [size]="16" /> Plan de 30 días</h3>
+            <div class="timeline">
+              @for (w of r.plan; track $index) {
+                <div class="week">
+                  <span class="node">{{ $index + 1 }}</span>
+                  <div class="card">
+                    <small>{{ w.week }}</small>
+                    <b>{{ w.focus }}</b>
+                    <ul>@for (a of w.actions; track $index) { <li>{{ a }}</li> }</ul>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (r.kpis?.length) {
+            <h3 class="sec"><app-icon name="trend" [size]="16" /> Metas a 30 días</h3>
+            <div class="kpis">
+              @for (k of r.kpis; track $index) { <div class="card kpi"><small>{{ k.name }}</small><b>{{ k.target }}</b></div> }
+            </div>
+          }
+        }
+
         <!-- ============ Guiones ============ -->
         @if (t === 'guiones') {
+          @if (formats(r).length > 1) {
+            <div class="seg filters no-print">
+              <button [class.on]="!formatFilter()" (click)="formatFilter.set('')">Todos</button>
+              @for (f of formats(r); track f) { <button [class.on]="formatFilter() === f" (click)="formatFilter.set(f)">{{ f }}</button> }
+            </div>
+          }
           <div class="scripts">
-            @for (s of r.scripts; track $index) {
+            @for (s of scripts(r); track s.title) {
               <div class="card script">
                 <div class="row wrap gap-6"><span class="chip">{{ s.format }}</span><span class="chip soft">{{ s.angle }}</span><span class="spacer"></span>
-                  <button class="btn ghost icon-only sm" title="Copiar guion" (click)="copy(scriptText(s))"><app-icon name="copy" [size]="14" /></button></div>
+                  <button class="btn ghost icon-only sm no-print" title="Copiar guion" (click)="copy(scriptText(s))"><app-icon name="copy" [size]="14" /></button></div>
                 <b class="title">{{ s.title }}</b>
                 <p class="hook"><small>Gancho (primeros 3 s)</small>{{ s.hook }}</p>
                 <ol>@for (x of s.scenes; track $index) { <li>{{ x }}</li> }</ol>
@@ -107,9 +272,23 @@
 
         <!-- ============ Clientes potenciales ============ -->
         @if (t === 'clientes') {
-          <div class="row export"><span class="spacer"></span><button class="btn sm" (click)="exportLeads(r)"><app-icon name="list" [size]="14" /> Exportar a Excel (CSV)</button></div>
+          <div class="row wrap export no-print">
+            <div class="seg">
+              <button [class.on]="minFit() === 0" (click)="minFit.set(0)">Todos</button>
+              <button [class.on]="minFit() === 4" (click)="minFit.set(4)">★ 4 o más</button>
+              <button [class.on]="minFit() === 5" (click)="minFit.set(5)">★ 5</button>
+            </div>
+            @if (leadTypes(r).length > 1) {
+              <select class="select sm" [ngModel]="typeFilter()" (ngModelChange)="typeFilter.set($event)">
+                <option value="">Todos los tipos</option>
+                @for (ty of leadTypes(r); track ty) { <option [value]="ty">{{ ty }}</option> }
+              </select>
+            }
+            <span class="spacer"></span>
+            <button class="btn sm" (click)="exportLeads(r)"><app-icon name="list" [size]="14" /> Exportar a Excel (CSV)</button>
+          </div>
           <div class="leads">
-            @for (l of r.leads; track $index) {
+            @for (l of leads(r); track l.name) {
               <div class="card lead">
                 <div class="lead-head">
                   <div><b>{{ l.name }}</b><small class="muted">{{ l.type }}{{ l.city ? ' · ' + l.city : '' }}</small></div>
@@ -121,24 +300,25 @@
                   <p>{{ l.approach }}</p>
                 </div>
                 <div class="row wrap gap-6">
-                  <button class="btn sm" (click)="copy(l.approach)"><app-icon name="copy" [size]="13" /> Copiar mensaje</button>
-                  @if (waLink(l); as wa) { <a class="btn sm" [href]="wa" target="_blank" rel="noopener noreferrer"><app-icon name="phone" [size]="13" /> WhatsApp</a> }
+                  <button class="btn sm no-print" (click)="copy(l.approach)"><app-icon name="copy" [size]="13" /> Copiar mensaje</button>
+                  @if (waLink(l); as wa) { <a class="btn sm no-print" [href]="wa" target="_blank" rel="noopener noreferrer"><app-icon name="phone" [size]="13" /> WhatsApp</a> }
                   @if (l.instagram) { <a class="btn sm" [href]="l.instagram" target="_blank" rel="noopener noreferrer nofollow"><app-icon name="external" [size]="13" /> Instagram</a> }
                   @if (l.website) { <a class="btn sm" [href]="l.website" target="_blank" rel="noopener noreferrer nofollow"><app-icon name="external" [size]="13" /> Web</a> }
                   @if (l.phone) { <span class="muted phone">{{ l.phone }}</span> }
                 </div>
               </div>
-            }
+            } @empty { <p class="muted">Ningún prospecto con ese filtro.</p> }
           </div>
           <p class="muted note">Son datos públicos de empresas encontrados en internet: verifícalos antes de contactar y respeta a quien no quiera recibir mensajes.</p>
         }
 
         @if (r.sources.length) {
-          <details class="sources">
+          <details class="sources" [open]="printing()">
             <summary>Fuentes consultadas ({{ r.sources.length }})</summary>
             <ul>@for (s of r.sources; track s.url) { <li><a [href]="s.url" target="_blank" rel="noopener noreferrer nofollow">{{ s.title }}</a></li> }</ul>
           </details>
         }
+        <p class="print-foot">Análisis generado con inteligencia artificial por JAUTHIA CRM a partir de información pública de internet. Verifica los datos antes de tomar decisiones.</p>
       } @else if (!busy()) {
         <div class="empty card card-pad">
           <app-icon name="target" [size]="28" />
@@ -148,7 +328,7 @@
     } @else {
       <!-- ============ Perfil del negocio ============ -->
       <section class="card card-pad">
-        <p class="muted">Con esta información la IA investiga a tu competencia y a tus clientes potenciales. Entre más clara, mejores resultados.</p>
+        <p class="muted">Con esta información la IA investiga a tu competencia, tus redes y tus clientes potenciales. Entre más clara, mejores resultados.</p>
         <app-business-profile-form [profile]="profile()" (changed)="profileDirty.set(true)" />
         @if (auth.isAdmin()) {
           <div class="row mt"><span class="spacer"></span>

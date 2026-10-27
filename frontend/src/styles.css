@@ -211,3 +211,15 @@ button.chip { cursor: pointer; }
   .input, .select, .textarea { font-size: 16px; }
   .toasts { left: 12px; right: 12px; bottom: 12px; }
 }
+
+/* ---------- Impresión / PDF: solo el contenido de la página, sin menú ---------- */
+@media print {
+  @page { margin: 14mm 12mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
+  app-shell { display: block !important; height: auto !important; overflow: visible !important; }
+  app-shell > aside, app-shell > .burger, app-shell .toasts, app-shell .acting { display: none !important; }
+  app-shell main { overflow: visible !important; }
+  app-shell .page { padding: 0 !important; max-width: none !important; height: auto !important; }
+  .card { box-shadow: none !important; }
+}

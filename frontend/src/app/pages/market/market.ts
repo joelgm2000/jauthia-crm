@@ -1,16 +1,18 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BusinessProfile, EMPTY_PROFILE, Lead, MARKET_KIND_LABEL, MarketData, MarketKind, MarketReport, profileMissing, ScriptIdea } from '@shared/market';
+import { BusinessProfile, EMPTY_PROFILE, Lead, Level, MARKET_KIND_LABEL, MarketData, MarketKind, MarketReport, Opportunity, profileMissing, ScriptIdea } from '@shared/market';
 import { AuthService } from '../../core/auth.service';
 import { CrmStore } from '../../core/data/crm-store';
 import { api } from '../../core/http';
 import { BusinessProfileForm, cleanProfile } from '../../ui/business-profile-form';
 import { Icon } from '../../ui/icon';
+import { ScoreRing, scoreColor } from '../../ui/score-ring';
 
 type Tab = MarketKind | 'perfil';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'competencia', label: 'Competencia', icon: 'trend' },
+  { id: 'redes', label: 'Redes sociales', icon: 'megaphone' },
   { id: 'guiones', label: 'Guiones', icon: 'play' },
   { id: 'clientes', label: 'Clientes potenciales', icon: 'users' },
   { id: 'perfil', label: 'Perfil del negocio', icon: 'edit' },
@@ -21,6 +23,11 @@ const HINTS: Record<MarketKind, { placeholder: string; button: string; intro: st
     intro: 'La IA investiga a tu competencia en internet y te dice dónde enfocarte que ellos no.',
     placeholder: 'Opcional: ej. "compárame con las tiendas en línea que venden en Valledupar"',
     button: 'Analizar competencia',
+  },
+  redes: {
+    intro: 'Auditoría de tus redes con puntajes, recomendaciones de grandes referentes del marketing, pilares de contenido y un plan de 30 días.',
+    placeholder: 'Opcional: ej. "enfócate en Instagram y TikTok" o "queremos vender más por WhatsApp"',
+    button: 'Analizar mis redes',
   },
   guiones: {
     intro: 'Ideas de videos y publicaciones para tu nicho, con gancho, escenas y llamado a la acción, listas para grabar.',
@@ -40,7 +47,7 @@ const HINTS: Record<MarketKind, { placeholder: string; button: string; intro: st
  */
 @Component({
   selector: 'app-market',
-  imports: [FormsModule, Icon, BusinessProfileForm],
+  imports: [FormsModule, Icon, BusinessProfileForm, ScoreRing],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './market.html',
   styleUrl: './market.css',
@@ -57,12 +64,23 @@ export class Market implements OnInit {
   readonly reports = signal<MarketReport[]>([]);
   readonly remaining = signal(0);
   readonly busy = signal<MarketKind | null>(null);
-  readonly selected = signal<Record<MarketKind, string | null>>({ competencia: null, guiones: null, clientes: null });
+  readonly selected = signal<Record<MarketKind, string | null>>({ competencia: null, redes: null, guiones: null, clientes: null });
   readonly profile = signal<BusinessProfile>(structuredClone(EMPTY_PROFILE));
   readonly profileDirty = signal(false);
   readonly savingProfile = signal(false);
   readonly missing = computed(() => (this.profileDirty(), profileMissing(this.profile())));
-  request: Record<MarketKind, string> = { competencia: '', guiones: '', clientes: '' };
+  request: Record<MarketKind, string> = { competencia: '', redes: '', guiones: '', clientes: '' };
+
+  /** Preparando el PDF: se muestra todo (sin filtros) y en tema claro. */
+  readonly printing = signal(false);
+  // Filtros de cada análisis
+  readonly oppFilter = signal<'todas' | 'impacto' | 'rapidas'>('todas');
+  readonly formatFilter = signal('');
+  readonly minFit = signal(0);
+  readonly typeFilter = signal('');
+  readonly scoreColor = scoreColor;
+  readonly levelLabel: Record<Level, string> = { alto: 'Alto', medio: 'Medio', bajo: 'Bajo' };
+  readonly pillarColors = ['#1a9dd9', '#74cbf1', '#141d29', '#f59e0b', '#16a34a', '#a855f7'];
 
   ngOnInit(): void {
     void this.load();
@@ -168,6 +186,68 @@ export class Market implements OnInit {
     a.download = `clientes-potenciales-${new Date(r.createdAt).toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  // -------------------------------------------------------------------------
+  // Filtros y vistas
+  // -------------------------------------------------------------------------
+
+  /** Oportunidades: primero las de más impacto y menos esfuerzo. */
+  opportunities(r: MarketReport): Opportunity[] {
+    const rank = (l?: Level) => (l === 'alto' ? 0 : l === 'medio' ? 1 : l === 'bajo' ? 2 : 1);
+    const f = this.printing() ? 'todas' : this.oppFilter();
+    return [...(r.opportunities ?? [])]
+      .filter((o) => f === 'todas' || (f === 'impacto' ? o.impact === 'alto' : o.effort === 'bajo'))
+      .sort((a, b) => rank(a.impact) - rank(b.impact) || rank(b.effort) - rank(a.effort));
+  }
+
+  formats(r: MarketReport): string[] {
+    return [...new Set((r.scripts ?? []).map((s) => s.format).filter(Boolean))];
+  }
+
+  scripts(r: MarketReport): ScriptIdea[] {
+    const f = this.printing() ? '' : this.formatFilter();
+    return (r.scripts ?? []).filter((s) => !f || s.format === f);
+  }
+
+  leadTypes(r: MarketReport): string[] {
+    return [...new Set((r.leads ?? []).map((l) => l.type).filter(Boolean))];
+  }
+
+  leads(r: MarketReport): Lead[] {
+    const min = this.printing() ? 0 : this.minFit();
+    const type = this.printing() ? '' : this.typeFilter();
+    return [...(r.leads ?? [])].filter((l) => l.fit >= min && (!type || l.type === type)).sort((a, b) => b.fit - a.fit);
+  }
+
+  /** Ancho de la barra de una comparación (puntaje de 1 a 10). */
+  pct(score: number): number {
+    return Math.max(4, Math.min(100, score * 10));
+  }
+
+  isYou(name: string): boolean {
+    return /tu negocio/i.test(name) || name.trim().toLowerCase() === (this.auth.tenant()?.name ?? '').trim().toLowerCase();
+  }
+
+  /** Descarga el análisis en PDF: abre la impresión del navegador ("Guardar como PDF") con el diseño de la marca. */
+  async downloadPdf(r: MarketReport): Promise<void> {
+    const root = document.documentElement;
+    const prevTheme = root.dataset['theme'];
+    const prevTitle = document.title;
+    const company = this.auth.tenant()?.name ?? '';
+    // El título se usa como nombre del archivo PDF.
+    document.title = `${this.kindLabel[r.kind]} - ${company} - ${new Date(r.createdAt).toISOString().slice(0, 10)}`;
+    root.dataset['theme'] = 'light';
+    this.printing.set(true);
+    const restore = () => {
+      this.printing.set(false);
+      document.title = prevTitle;
+      if (prevTheme) root.dataset['theme'] = prevTheme;
+      else delete root.dataset['theme'];
+    };
+    window.addEventListener('afterprint', restore, { once: true });
+    await new Promise((ok) => setTimeout(ok, 150)); // deja dibujar la versión completa
+    window.print();
   }
 
   isKind(t: Tab): t is MarketKind {

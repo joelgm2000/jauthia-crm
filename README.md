@@ -75,9 +75,14 @@ contacto, **qué contrató** (CRM, Chatbot o ambos), plan, mensualidad, día de 
   en internet y entrega:
   - **Competencia:** qué hace cada competidor, fortalezas, debilidades y **dónde enfocarse que la competencia no**,
     con una acción concreta para cada oportunidad.
+  - **Competencia (además):** qué hace cada competidor en Google y redes para atraer clientes y sus videos que mejor
+    funcionaron (con visitas, me gusta y comentarios cuando son públicos), y un comparativo de 1 a 10 frente a ellos.
+  - **Redes sociales:** puntaje de 0 a 100 de sus redes y red por red, recomendaciones de grandes referentes del
+    marketing, pilares de contenido, plan de 30 días y metas.
   - **Guiones:** ideas de Reels, TikTok, historias y carruseles con gancho, escenas y llamado a WhatsApp.
   - **Clientes potenciales:** negocios reales (solo datos públicos de empresas, nunca personas) con web, teléfono,
     Instagram, por qué podrían comprar, un mensaje de primer contacto, botón de WhatsApp y exportar a Excel.
+  Cada análisis tiene filtros, gráficos y **Descargar PDF** (con el logo de JAUTHIA y el nombre del cliente).
   Usa la misma clave de Gemini del cliente. Tope de 20 análisis por día por cliente (`MARKET_DAILY_LIMIT`) y uno a la vez.
 - **Flujo del bot:** preguntas, botones, rutas, mensajes y seguimientos propios. Una pregunta puede tomar sus opciones
   directamente de las categorías del catálogo. `{empresa}` se reemplaza por el nombre del negocio.
