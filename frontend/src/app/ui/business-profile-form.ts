@@ -26,14 +26,23 @@ import { Icon } from './icon';
       <div class="field"><label>Instagram</label><input class="input" maxlength="300" [(ngModel)]="p.instagram" (ngModelChange)="changed.emit()" placeholder="@usuario o https://instagram.com/…" /></div>
       <div class="field"><label>Facebook</label><input class="input" maxlength="300" [(ngModel)]="p.facebook" (ngModelChange)="changed.emit()" placeholder="https://facebook.com/…" /></div>
       <div class="field"><label>TikTok</label><input class="input" maxlength="300" [(ngModel)]="p.tiktok" (ngModelChange)="changed.emit()" placeholder="@usuario" /></div>
+      <div class="field"><label>YouTube</label><input class="input" maxlength="300" [(ngModel)]="p.youtube" (ngModelChange)="changed.emit()" placeholder="@canal o https://youtube.com/@…" /></div>
     </div>
     <div class="field">
-      <label>Competidores que ya conoces (opcional) <small class="muted">No hace falta: la IA busca en Google los competidores de tu nicho en tu zona. Si conoces alguno, agrégalo para que lo incluya.</small></label>
+      <label>Competidores <small class="muted">Para el análisis con IA son opcionales (los busca sola). Para las <b>estadísticas reales</b> escribe aquí sus cuentas exactas: solo se miden las que confirmes.</small></label>
       @for (c of p.competitors; track $index) {
         <div class="comp">
-          <input class="input" maxlength="120" [(ngModel)]="c.name" (ngModelChange)="changed.emit()" placeholder="Nombre" />
-          <input class="input" maxlength="300" [(ngModel)]="c.url" (ngModelChange)="changed.emit()" placeholder="https://… o @usuario" />
-          <button type="button" class="btn ghost icon-only sm" title="Quitar" (click)="p.competitors.splice($index, 1); changed.emit()"><app-icon name="trash" [size]="14" /></button>
+          <div class="comp-top">
+            <input class="input" maxlength="120" [(ngModel)]="c.name" (ngModelChange)="changed.emit()" placeholder="Nombre del competidor" />
+            <input class="input" maxlength="300" [(ngModel)]="c.url" (ngModelChange)="changed.emit()" placeholder="Sitio web (opcional)" />
+            <button type="button" class="btn ghost icon-only sm" title="Quitar" (click)="p.competitors.splice($index, 1); changed.emit()"><app-icon name="trash" [size]="14" /></button>
+          </div>
+          <div class="comp-nets">
+            <input class="input" maxlength="300" [(ngModel)]="c.instagram" (ngModelChange)="changed.emit()" placeholder="Instagram: @usuario" />
+            <input class="input" maxlength="300" [(ngModel)]="c.facebook" (ngModelChange)="changed.emit()" placeholder="Facebook: enlace de la página" />
+            <input class="input" maxlength="300" [(ngModel)]="c.tiktok" (ngModelChange)="changed.emit()" placeholder="TikTok: @usuario" />
+            <input class="input" maxlength="300" [(ngModel)]="c.youtube" (ngModelChange)="changed.emit()" placeholder="YouTube: @canal" />
+          </div>
         </div>
       }
       @if (p.competitors.length < 10) {
@@ -44,8 +53,11 @@ import { Icon } from './icon';
   styles: `
     :host { display: flex; flex-direction: column; gap: 10px; }
     label small { font-weight: 400; margin-left: 4px; }
-    .comp { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 6px; margin-bottom: 6px; }
-    @media (max-width: 640px) { .comp { grid-template-columns: 1fr auto; } .comp input:nth-child(2) { grid-column: 1; grid-row: 2; } }
+    .comp { border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .comp-top { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 6px; }
+    .comp-nets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    @media (max-width: 900px) { .comp-nets { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 640px) { .comp-top { grid-template-columns: 1fr auto; } .comp-top input:nth-child(2) { grid-column: 1; grid-row: 2; } .comp-nets { grid-template-columns: 1fr; } }
   `,
 })
 export class BusinessProfileForm {
@@ -58,7 +70,9 @@ export function cleanProfile(p: BusinessProfile): BusinessProfile {
   const t = (s?: string) => (s ?? '').trim();
   return {
     description: t(p.description), industry: t(p.industry), zone: t(p.zone), idealCustomer: t(p.idealCustomer),
-    differentiators: t(p.differentiators), website: t(p.website), instagram: t(p.instagram), facebook: t(p.facebook), tiktok: t(p.tiktok),
-    competitors: p.competitors.map((c) => ({ name: t(c.name), url: t(c.url) })).filter((c) => c.name),
+    differentiators: t(p.differentiators), website: t(p.website), instagram: t(p.instagram), facebook: t(p.facebook), tiktok: t(p.tiktok), youtube: t(p.youtube),
+    competitors: p.competitors
+      .map((c) => ({ name: t(c.name), url: t(c.url), instagram: t(c.instagram), facebook: t(c.facebook), tiktok: t(c.tiktok), youtube: t(c.youtube) }))
+      .filter((c) => c.name),
   };
 }

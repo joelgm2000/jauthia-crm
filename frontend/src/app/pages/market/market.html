@@ -24,12 +24,26 @@
         </div>
       }
 
+      <!-- Encabezado que solo aparece en el PDF -->
+      <div class="print-head">
+        <img src="brand/isotipo.webp" alt="" />
+        <div><b>JAUTHIA</b><small>Inteligencia de mercado</small></div>
+        <span class="spacer"></span>
+        <div class="ph-right"><b>{{ auth.tenant()?.name }}</b><small>{{ when(current(t)?.createdAt ?? now, true) }}</small></div>
+      </div>
+
+      @if (t === 'estadisticas') {
+        <h2 class="print-only">{{ kindLabel.estadisticas }}</h2>
+        <app-market-stats [admin]="auth.isAdmin()" [printing]="printing()" (pdf)="downloadStatsPdf()" (ready)="statsReady.set($event)" />
+        <h3 class="sec ai-title"><app-icon name="sparkles" [size]="16" /> Lo que dicen los números (interpretación de la IA)</h3>
+      }
+
       <section class="card run no-print">
         <p class="muted">{{ hints[t].intro }}</p>
         @if (auth.isAdmin()) {
           <div class="run-row">
             <input class="input" maxlength="400" [placeholder]="hints[t].placeholder" [(ngModel)]="request[t]" (keydown.enter)="run(t)" [disabled]="!!busy()" />
-            <button class="btn primary" [disabled]="!!busy() || !!missing().length || remaining() < 1" (click)="run(t)">
+            <button class="btn primary" [disabled]="!!busy() || !!missing().length || remaining() < 1 || (t === 'estadisticas' && !statsReady())" (click)="run(t)">
               <app-icon name="sparkles" [size]="15" /> {{ hints[t].button }}
             </button>
           </div>
@@ -42,14 +56,6 @@
       </section>
 
       @if (current(t); as r) {
-        <!-- Encabezado que solo aparece en el PDF -->
-        <div class="print-head">
-          <img src="brand/isotipo.webp" alt="" />
-          <div><b>JAUTHIA</b><small>Inteligencia de mercado</small></div>
-          <span class="spacer"></span>
-          <div class="ph-right"><b>{{ auth.tenant()?.name }}</b><small>{{ when(r.createdAt, true) }}</small></div>
-        </div>
-
         <div class="report-head">
           <h2>{{ kindLabel[t] }}</h2>
           <span class="spacer"></span>
@@ -58,7 +64,7 @@
               @for (h of history(t); track h.id) { <option [value]="h.id">{{ when(h.createdAt) }}{{ h.request ? ' · ' + h.request.slice(0, 40) : '' }}</option> }
             </select>
           }
-          <button class="btn sm primary no-print" (click)="downloadPdf(r)" title="Descargar este análisis en PDF"><app-icon name="download" [size]="14" /> Descargar PDF</button>
+          @if (t !== 'estadisticas') { <button class="btn sm primary no-print" (click)="downloadPdf(r)" title="Descargar este análisis en PDF"><app-icon name="download" [size]="14" /> Descargar PDF</button> }
         </div>
         <p class="meta muted">{{ when(r.createdAt, true) }} · por {{ r.by }}@if (r.request) { · "{{ r.request }}" }</p>
         @if (r.summary && t !== 'redes') { <div class="card summary"><app-icon name="sparkles" [size]="16" /><p>{{ r.summary }}</p></div> }
@@ -143,7 +149,7 @@
                               @if (v.likes) { <span>♥ {{ v.likes }}</span> }
                               @if (v.comments) { <span>💬 {{ v.comments }}</span> }
                             </div>
-                          } @else { <small class="muted">Cifras no públicas</small> }
+                          } @else { <small class="muted">Cifras reales: pestaña <a href="" (click)="$event.preventDefault(); tab.set('estadisticas')">Estadísticas reales</a></small> }
                           @if (v.why) { <p>{{ v.why }}</p> }
                         </div>
                       }
@@ -151,6 +157,29 @@
                   }
                 </div>
               }
+            </div>
+          }
+        }
+
+        <!-- ============ Estadísticas reales: interpretación ============ -->
+        @if (t === 'estadisticas') {
+          @if (r.winners?.length) {
+            <h3 class="sec"><app-icon name="flame" [size]="16" /> Publicaciones para tomar como ejemplo</h3>
+            <div class="opps">
+              @for (w of r.winners; track w.url) {
+                <div class="card opp">
+                  <div class="row wrap gap-6"><span class="chip">{{ w.network }}</span><b>{{ w.owner }}</b><span class="spacer"></span>
+                    <a [href]="w.url" target="_blank" rel="noopener noreferrer nofollow" title="Ver publicación"><app-icon name="external" [size]="14" /></a></div>
+                  <p>{{ w.why }}</p>
+                  @if (w.adapt) { <p class="action"><app-icon name="check" [size]="13" /> {{ w.adapt }}</p> }
+                </div>
+              }
+            </div>
+          }
+          @if (r.insights?.length) {
+            <h3 class="sec"><app-icon name="sparkles" [size]="16" /> Hallazgos</h3>
+            <div class="tips">
+              @for (i of r.insights; track $index) { <div class="card tip"><b>{{ i.title }}</b><p>{{ i.detail }}</p></div> }
             </div>
           }
         }

@@ -167,3 +167,10 @@
   .bar i, .stack i { animation: none; }
   .sources a { color: #1a9dd9; }
 }
+
+/* ---------- Estadísticas reales ---------- */
+.print-only { display: none; }
+.ai-title { margin-top: 24px; }
+@media print {
+  .print-only { display: block; font-size: 20px; margin: 0 0 8px; }
+}

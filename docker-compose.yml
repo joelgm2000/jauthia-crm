@@ -41,6 +41,9 @@ services:
       # Inteligencia de mercado (investiga con búsqueda de Google).
       AI_TEXT_MODEL: ${AI_TEXT_MODEL:-gemini-2.5-flash}
       MARKET_DAILY_LIMIT: ${MARKET_DAILY_LIMIT:-20}
+      # Estadísticas reales de redes (opcional: también se ponen por cliente en el panel).
+      META_SOCIAL_TOKEN: ${META_SOCIAL_TOKEN:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
     volumes:
       - media:/app/media
     # Solo Caddy llega a la app (red interna).

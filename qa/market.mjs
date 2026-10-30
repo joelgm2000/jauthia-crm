@@ -166,9 +166,9 @@ check('Oportunidades: impacto normalizado ("ALTO" → alto) y esfuerzo inválido
 check('Comparación: puntajes entre 1 y 10 y sin aspectos con un solo nombre', rep?.comparison?.length === 1 && JSON.stringify(rep.comparison[0].scores.map((s) => s.score)) === '[7,10,1]', JSON.stringify(rep?.comparison));
 const top = rep?.competitors?.[0]?.topContent ?? [];
 check('Competidor: cómo atrae clientes', rep?.competitors?.[0]?.tactics?.length === 2);
-check('Video de la competencia con visitas, me gusta y comentarios', top[0]?.views === '125 mil' && top[0]?.likes === '8.4K' && top[0]?.comments === '312' && top[0]?.url?.startsWith('https://www.tiktok.com/'), JSON.stringify(top[0]));
+check('Videos de la competencia: tema y enlace, SIN cifras de la IA (las reales van en Estadísticas)', top[0]?.url?.startsWith('https://www.tiktok.com/') && top[0]?.views === undefined && top[0]?.likes === undefined && top[0]?.comments === undefined, JSON.stringify(top[0]));
 check('Cifras o enlaces sospechosos del video se descartan', top[1]?.views === undefined && top[1]?.likes === undefined && top[1]?.url === undefined, JSON.stringify(top[1]));
-check('La IA busca qué videos y tácticas le funcionan a la competencia, sin inventar cifras', call1?.prompt.includes('videos o publicaciones que mejor han funcionado') && call1.prompt.includes('SOLO si las ves publicadas'));
+check('La instrucción prohíbe a la IA dar cifras de visitas o seguidores', call1?.prompt.includes('NO des cifras de visitas'));
 check('Guarda quién lo pidió y la indicación', rep?.by === 'Usuario adm' && rep?.request === 'compárame con tiendas en línea');
 
 console.log('\nRedes sociales');

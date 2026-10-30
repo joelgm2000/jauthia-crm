@@ -20,6 +20,7 @@ import { HOUR, MINUTE } from '../../shared/time';
 import { Ctx, loadCtx, notifyStageChange, STAGE_CHANGED } from './core';
 import { bus, getDoc, insertMessage, patchDoc, pool, putDoc, txEmit } from './db';
 import { log } from './log';
+import { refreshStaleSocial } from './social';
 
 function autoContext(ctx: Ctx, now: number): AutoContext {
   return { products: ctx.products, templates: ctx.templates, companyName: ctx.settings.companyName, now };
@@ -150,4 +151,6 @@ export function startAutomation(): void {
   });
   const tick = () => runRemarketing().catch((e) => log.error('remarketing', e));
   setInterval(tick, 5 * MINUTE);
+  // Estadísticas reales de redes: se vuelven a leer solas una vez por semana.
+  setInterval(() => refreshStaleSocial().catch((e) => log.error('estadísticas de redes', e)), HOUR);
 }

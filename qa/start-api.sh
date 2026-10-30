@@ -15,4 +15,5 @@ export TRUST_PROXY=${TRUST_PROXY:-}
 export MEDIA_DIR="C:/Users/JOEL/Documents/JAUTHIA CRM EvoSport/jauthia-crm/qa/results/media"
 export GEMINI_API_KEY=${GEMINI_API_KEY:-}
 export AI_BASE_URL=${AI_BASE_URL:-}
+export SOCIAL_GRAPH_URL=${SOCIAL_GRAPH_URL:-} YOUTUBE_API_URL=${YOUTUBE_API_URL:-} META_SOCIAL_TOKEN=${META_SOCIAL_TOKEN:-} YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
 exec node node_modules/tsx/dist/cli.mjs src/server.ts

@@ -16,7 +16,7 @@ import { invalidateCtx, publishTeam } from './core';
 import { pool } from './db';
 import { log } from './log';
 import { businessProfile, emailSchema, passwordSchema, short, tenantRole } from './schemas';
-import { getAiKey, setAiKey } from './secrets';
+import { getAiKey, getSocialKeys, setAiKey, setSocialKeys } from './secrets';
 import { seedTenant } from './tenants';
 
 const tenantId = z.string().min(3).max(60).regex(/^[a-z0-9-]+$/, 'Solo minúsculas, números y guiones');
@@ -45,6 +45,10 @@ const schemas: Record<SuperAction, z.ZodType> = {
   saveTenant: z.object({
     tenant, flowTemplate: z.enum(['evosport', 'generico']).optional(), sampleCatalog: z.boolean().optional(),
     aiApiKey: z.union([z.literal(''), z.string().trim().regex(/^[\w-]{20,200}$/, 'La clave API no tiene un formato válido')]).optional(),
+    socialKeys: z.object({
+      metaToken: z.union([z.literal(''), z.string().trim().regex(/^[\w|.-]{30,1000}$/, 'El token de Meta no tiene un formato válido')]).optional(),
+      youtubeKey: z.union([z.literal(''), z.string().trim().regex(/^[\w-]{20,200}$/, 'La clave de YouTube no tiene un formato válido')]).optional(),
+    }).optional(),
   }),
   deleteTenant: z.object({ id: tenantId, confirmName: short(120) }),
   listTenantUsers: z.object({ tenantId }),
@@ -75,10 +79,15 @@ const handlers: { [A in SuperAction]: Handler<A> } = {
              (SELECT max(m.created_at) FROM messages m WHERE m.tenant_id = t.id) AS last,
              EXISTS (SELECT 1 FROM channel_secrets s WHERE s.tenant_id = t.id AND s.channel = 'ai') AS ai_row
       FROM tenants t ORDER BY t.created_at`);
-    const tenants: TenantSummary[] = await Promise.all(r.rows.map(async (x) => ({
-      ...x.data, users: x.users, conversations: x.conversations, lastActivityAt: x.last ?? null,
-      aiKeySaved: x.ai_row && !!(await getAiKey(x.data.id)),
-    })));
+    const tenants: TenantSummary[] = await Promise.all(r.rows.map(async (x) => {
+      const social = await getSocialKeys(x.data.id);
+      return {
+        ...x.data, users: x.users, conversations: x.conversations, lastActivityAt: x.last ?? null,
+        aiKeySaved: x.ai_row && !!(await getAiKey(x.data.id)),
+        // Solo si están guardadas: las claves nunca viajan al navegador.
+        socialKeysSaved: { meta: !!social.metaToken, youtube: !!social.youtubeKey },
+      };
+    }));
     return { tenants };
   },
 
@@ -91,6 +100,10 @@ const handlers: { [A in SuperAction]: Handler<A> } = {
     if (d.aiApiKey !== undefined) {
       await setAiKey(t.id, d.aiApiKey);
       log.info(d.aiApiKey ? 'Clave de IA del cliente guardada' : 'Clave de IA del cliente quitada', { tenant: t.id });
+    }
+    if (d.socialKeys && (d.socialKeys.metaToken !== undefined || d.socialKeys.youtubeKey !== undefined)) {
+      await setSocialKeys(t.id, d.socialKeys);
+      log.info('Claves de redes del cliente actualizadas', { tenant: t.id, meta: d.socialKeys.metaToken === undefined ? 'igual' : d.socialKeys.metaToken ? 'guardado' : 'quitado', youtube: d.socialKeys.youtubeKey === undefined ? 'igual' : d.socialKeys.youtubeKey ? 'guardada' : 'quitada' });
     }
     invalidateCtx(t.id);
     // Al suspender, las sesiones de ese cliente dejan de valer de inmediato.

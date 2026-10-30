@@ -7,11 +7,13 @@ import { api } from '../../core/http';
 import { BusinessProfileForm, cleanProfile } from '../../ui/business-profile-form';
 import { Icon } from '../../ui/icon';
 import { ScoreRing, scoreColor } from '../../ui/score-ring';
+import { MarketStats } from './market-stats';
 
 type Tab = MarketKind | 'perfil';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'competencia', label: 'Competencia', icon: 'trend' },
+  { id: 'estadisticas', label: 'Estadísticas reales', icon: 'dashboard' },
   { id: 'redes', label: 'Redes sociales', icon: 'megaphone' },
   { id: 'guiones', label: 'Guiones', icon: 'play' },
   { id: 'clientes', label: 'Clientes potenciales', icon: 'users' },
@@ -23,6 +25,11 @@ const HINTS: Record<MarketKind, { placeholder: string; button: string; intro: st
     intro: 'La IA investiga a tu competencia en internet y te dice dónde enfocarte que ellos no.',
     placeholder: 'Opcional: ej. "compárame con las tiendas en línea que venden en Valledupar"',
     button: 'Analizar competencia',
+  },
+  estadisticas: {
+    intro: 'La IA interpreta las cifras reales de arriba (no busca en internet ni inventa números): qué funciona, qué publicaciones copiar y cómo adaptarlas.',
+    placeholder: 'Opcional: ej. "fíjate en los videos de TikTok" o "qué debería publicar esta semana"',
+    button: 'Analizar con IA',
   },
   redes: {
     intro: 'Auditoría de tus redes con puntajes, recomendaciones de grandes referentes del marketing, pilares de contenido y un plan de 30 días.',
@@ -47,7 +54,7 @@ const HINTS: Record<MarketKind, { placeholder: string; button: string; intro: st
  */
 @Component({
   selector: 'app-market',
-  imports: [FormsModule, Icon, BusinessProfileForm, ScoreRing],
+  imports: [FormsModule, Icon, BusinessProfileForm, ScoreRing, MarketStats],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './market.html',
   styleUrl: './market.css',
@@ -64,15 +71,18 @@ export class Market implements OnInit {
   readonly reports = signal<MarketReport[]>([]);
   readonly remaining = signal(0);
   readonly busy = signal<MarketKind | null>(null);
-  readonly selected = signal<Record<MarketKind, string | null>>({ competencia: null, redes: null, guiones: null, clientes: null });
+  readonly selected = signal<Record<MarketKind, string | null>>({ competencia: null, estadisticas: null, redes: null, guiones: null, clientes: null });
   readonly profile = signal<BusinessProfile>(structuredClone(EMPTY_PROFILE));
   readonly profileDirty = signal(false);
   readonly savingProfile = signal(false);
   readonly missing = computed(() => (this.profileDirty(), profileMissing(this.profile())));
-  request: Record<MarketKind, string> = { competencia: '', redes: '', guiones: '', clientes: '' };
+  request: Record<MarketKind, string> = { competencia: '', estadisticas: '', redes: '', guiones: '', clientes: '' };
+  /** Hay estadísticas reales con publicaciones (la IA puede interpretarlas). */
+  readonly statsReady = signal(false);
 
   /** Preparando el PDF: se muestra todo (sin filtros) y en tema claro. */
   readonly printing = signal(false);
+  readonly now = Date.now();
   // Filtros de cada análisis
   readonly oppFilter = signal<'todas' | 'impacto' | 'rapidas'>('todas');
   readonly formatFilter = signal('');
@@ -231,12 +241,21 @@ export class Market implements OnInit {
 
   /** Descarga el análisis en PDF: abre la impresión del navegador ("Guardar como PDF") con el diseño de la marca. */
   async downloadPdf(r: MarketReport): Promise<void> {
+    await this.printDoc(this.kindLabel[r.kind], r.createdAt);
+  }
+
+  /** PDF de la pestaña de estadísticas reales (con la interpretación de la IA si hay). */
+  async downloadStatsPdf(): Promise<void> {
+    await this.printDoc(this.kindLabel.estadisticas, Date.now());
+  }
+
+  private async printDoc(title: string, date: number): Promise<void> {
     const root = document.documentElement;
     const prevTheme = root.dataset['theme'];
     const prevTitle = document.title;
     const company = this.auth.tenant()?.name ?? '';
     // El título se usa como nombre del archivo PDF.
-    document.title = `${this.kindLabel[r.kind]} - ${company} - ${new Date(r.createdAt).toISOString().slice(0, 10)}`;
+    document.title = `${title} - ${company} - ${new Date(date).toISOString().slice(0, 10)}`;
     root.dataset['theme'] = 'light';
     this.printing.set(true);
     const restore = () => {

@@ -21,8 +21,8 @@ export const SECRET_FIELDS: Partial<Record<ChannelType, string[]>> = {
 
 export type ChannelSecrets = Record<string, string>;
 
-/** Fila de channel_secrets: un canal, o 'ai' para la clave de la IA de imágenes del cliente. */
-type SecretScope = ChannelType | 'ai';
+/** Fila de channel_secrets: un canal, 'ai' (clave de Gemini) o 'social' (token de Meta y clave de YouTube para las estadísticas). */
+type SecretScope = ChannelType | 'ai' | 'social';
 
 function encrypt(plain: string): string {
   const iv = randomBytes(12);
@@ -77,6 +77,25 @@ export async function getAiKey(tenantId: string): Promise<string> {
 /** Guarda la clave de IA del cliente; "" la quita. */
 export async function setAiKey(tenantId: string, key: string): Promise<void> {
   await writeSecrets(tenantId, 'ai', ['geminiApiKey'], { geminiApiKey: key });
+}
+
+/** Claves para leer estadísticas reales de redes (Meta: Instagram y Facebook; YouTube). Nunca salen hacia el navegador. */
+export interface SocialKeys {
+  metaToken?: string;
+  /** Cuenta de Instagram de empresa desde la que se consulta (se detecta sola a partir del token). */
+  igUserId?: string;
+  youtubeKey?: string;
+}
+
+export async function getSocialKeys(tenantId: string): Promise<SocialKeys> {
+  return getSecrets(tenantId, 'social');
+}
+
+/** Guarda las claves enviadas; "" quita esa clave. Cambiar el token de Meta olvida la cuenta de Instagram detectada. */
+export async function setSocialKeys(tenantId: string, patch: SocialKeys): Promise<void> {
+  const p: ChannelSecrets = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as ChannelSecrets;
+  if (p['metaToken'] !== undefined && !('igUserId' in patch)) p['igUserId'] = '';
+  await writeSecrets(tenantId, 'social', ['metaToken', 'igUserId', 'youtubeKey'], p);
 }
 
 /** Lo que ve el navegador: qué campos están guardados y sus últimos 4 caracteres. */

@@ -1,0 +1,184 @@
+@if (loading()) {
+  <div class="card card-pad muted">Cargando estadísticas…</div>
+} @else if (data(); as d) {
+  <section class="card head">
+    <div class="conn">
+      <span class="pill" [class.on]="d.connections.meta"><app-icon [name]="d.connections.meta ? 'check' : 'x'" [size]="12" /> Instagram (API oficial)</span>
+      <span class="pill" [class.on]="d.connections.meta"><app-icon [name]="d.connections.meta ? 'check' : 'x'" [size]="12" /> Facebook (API oficial)</span>
+      <span class="pill" [class.on]="d.connections.youtube"><app-icon [name]="d.connections.youtube ? 'check' : 'x'" [size]="12" /> YouTube (API oficial)</span>
+      <span class="pill manual"><app-icon name="edit" [size]="12" /> TikTok (captura manual)</span>
+    </div>
+    <div class="actions">
+      @if (d.lastRefresh) { <small class="muted">Actualizado {{ when(d.lastRefresh, true) }}</small> }
+      @if (admin()) {
+        <button class="btn sm no-print" [disabled]="refreshing() || d.refreshesLeft < 1 || (!d.connections.meta && !d.connections.youtube) || !d.accounts.length" (click)="refresh()"
+          [title]="d.refreshesLeft + ' actualizaciones disponibles hoy'">
+          <app-icon name="refresh" [size]="14" /> {{ refreshing() ? 'Leyendo las cuentas…' : 'Actualizar datos reales' }}
+        </button>
+      }
+      <button class="btn sm primary no-print" [disabled]="!d.accounts.length" (click)="pdf.emit()"><app-icon name="download" [size]="14" /> Descargar PDF</button>
+    </div>
+    @if (!d.connections.meta && !d.connections.youtube) {
+      <p class="warn no-print"><app-icon name="info" [size]="14" /> Falta conectar el token de Meta o la clave de YouTube. Los pone el administrador de la plataforma en <b>Editar cliente</b>. Mientras tanto puedes capturar los datos a mano.</p>
+    }
+  </section>
+
+  @if (!d.accounts.length) {
+    <div class="empty card card-pad">
+      <app-icon name="users" [size]="28" />
+      <p>Aún no hay cuentas para medir. En <b>Perfil del negocio</b> escribe tus redes y las cuentas exactas de cada competidor (Instagram, Facebook, TikTok, YouTube).</p>
+    </div>
+  } @else {
+    <!-- Comparativos -->
+    @if (withFollowers().length > 1 || withEngagement().length > 1) {
+      <div class="duo">
+        @if (withFollowers().length) {
+          <div class="card chart-card">
+            <h3>Seguidores</h3>
+            @for (a of withFollowers(); track a.key) {
+              <div class="hbar" [class.you]="a.isSelf">
+                <span class="who" [title]="a.owner + ' · ' + label[a.network]">{{ a.owner }} <small>{{ label[a.network] }}</small></span>
+                <span class="track"><i [style.width.%]="(a.followers! / maxFollowers()) * 100"></i></span>
+                <b>{{ n(a.followers) }}</b>
+              </div>
+            }
+          </div>
+        }
+        @if (withEngagement().length) {
+          <div class="card chart-card">
+            <h3>Interacción por publicación <small class="muted">(me gusta + comentarios + compartidos ÷ seguidores)</small></h3>
+            @for (x of withEngagement(); track x.a.key) {
+              <div class="hbar" [class.you]="x.a.isSelf">
+                <span class="who">{{ x.a.owner }} <small>{{ label[x.a.network] }}</small></span>
+                <span class="track"><i [style.width.%]="(x.er / maxEngagement()) * 100"></i></span>
+                <b>{{ x.er }} %</b>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Ranking -->
+    @if (ranking().length) {
+      <h3 class="sec"><app-icon name="flame" [size]="16" /> Las publicaciones que mejor funcionaron</h3>
+      <div class="card rank">
+        <table>
+          <thead><tr><th>#</th><th>Cuenta</th><th>Publicación</th><th class="r">Visitas</th><th class="r">Me gusta</th><th class="r">Coment.</th><th class="r">Compart.</th></tr></thead>
+          <tbody>
+            @for (r of ranking(); track r.post.id + r.account.key; let i = $index) {
+              <tr [class.you]="r.account.isSelf">
+                <td class="pos">{{ i + 1 }}</td>
+                <td><b>{{ r.account.owner }}</b><small>{{ label[r.account.network] }} · {{ when(r.post.date) }}</small></td>
+                <td class="cap">
+                  <span class="kind">{{ r.post.kind }}</span> {{ r.post.caption || 'Sin texto' }}
+                  @if (r.post.url) { <a [href]="r.post.url" target="_blank" rel="noopener noreferrer nofollow" title="Ver publicación"><app-icon name="external" [size]="12" /></a> }
+                </td>
+                <td class="r">{{ n(r.post.views, false) }}</td>
+                <td class="r">{{ n(r.post.likes, false) }}</td>
+                <td class="r">{{ n(r.post.comments, false) }}</td>
+                <td class="r">{{ n(r.post.shares, false) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- Por cuenta -->
+    @for (g of owners(); track g.owner) {
+      <h3 class="sec owner"><app-icon [name]="g.isSelf ? 'user' : 'trend'" [size]="16" /> {{ g.owner }}</h3>
+      <div class="accounts">
+        @for (a of g.accounts; track a.key) {
+          @let s = stats(a);
+          <div class="card account">
+            <div class="a-head">
+              <span class="net" [class]="'net ' + a.network">{{ label[a.network] }}</span>
+              <b>{{ at(a) }}</b>
+              @if (a.name) { <small class="muted">{{ a.name }}</small> }
+              <span class="spacer"></span>
+              @if (admin() && (a.network === 'tiktok' || !canApi(a) || a.error)) {
+                <button class="btn ghost sm no-print" (click)="openManual(a)" title="Copiar las cifras que ves en la red"><app-icon name="edit" [size]="13" /> Capturar a mano</button>
+              }
+            </div>
+
+            @if (a.followers !== undefined || a.posts.length) {
+              <div class="kpis">
+                <div><small>Seguidores</small><b>{{ n(a.followers) }}</b>
+                  @if (s.delta) { <em [class.up]="s.delta.diff > 0" [class.down]="s.delta.diff < 0">{{ s.delta.diff > 0 ? '+' : '' }}{{ n(s.delta.diff) }} desde {{ when(s.delta.since) }}</em> }
+                </div>
+                <div><small>Publica</small><b>{{ s.ppw !== undefined ? s.ppw + '/sem' : '—' }}</b></div>
+                <div><small>Prom. visitas</small><b>{{ n(s.views) }}</b></div>
+                <div><small>Prom. me gusta</small><b>{{ n(s.likes) }}</b></div>
+                <div><small>Prom. coment.</small><b>{{ n(s.comments) }}</b></div>
+                <div><small>Interacción</small><b>{{ s.er !== undefined ? s.er + ' %' : '—' }}</b></div>
+              </div>
+
+              @if (a.posts.length > 1) {
+                <div class="spark" [title]="'Últimas publicaciones: ' + chartMetric(a)">
+                  @for (c of chart(a); track c.post.id) { <i [style.height.%]="c.pct" [title]="when(c.post.date) + ' · ' + n(c.value, false) + ' ' + chartMetric(a)"></i> }
+                </div>
+                <small class="muted spark-label">Últimas {{ chart(a).length }} publicaciones por fecha ({{ chartMetric(a) }})</small>
+              }
+
+              <div class="posts">
+                @for (p of latest(a); track p.id) {
+                  <div class="post">
+                    <span class="date">{{ when(p.date) }}</span>
+                    <span class="kind">{{ p.kind }}</span>
+                    <span class="cap">{{ p.caption || 'Sin texto' }}</span>
+                    <span class="m">@if (p.views !== undefined) { 👁 {{ n(p.views) }} } ♥ {{ n(p.likes) }} 💬 {{ n(p.comments) }}@if (p.shares !== undefined) { ↗ {{ n(p.shares) }} }</span>
+                    @if (p.url) { <a [href]="p.url" target="_blank" rel="noopener noreferrer nofollow" title="Ver"><app-icon name="external" [size]="12" /></a> }
+                  </div>
+                }
+              </div>
+            } @else if (!a.error) {
+              <p class="muted small">Sin datos todavía.@if (canApi(a)) { Toca <b>Actualizar datos reales</b>. } @else { Captúralos a mano. }</p>
+            }
+
+            @if (a.error) { <p class="err"><app-icon name="info" [size]="13" /> {{ a.error }}</p> }
+            @if (a.fetchedAt) {
+              <small class="source">
+                @if (a.source === 'manual') { ✍️ Capturado a mano por {{ a.by }} el {{ when(a.fetchedAt, true) }} }
+                @else { ✓ Dato real de la API oficial de {{ label[a.network] }}, leído el {{ when(a.fetchedAt, true) }} }
+              </small>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+}
+
+@if (editing(); as a) {
+  <div class="overlay no-print" (click)="editing.set(null)">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-head"><app-icon name="edit" /><h2>Capturar a mano · {{ label[a.network] }} {{ at(a) }}</h2><span class="spacer"></span>
+        <button class="btn ghost icon-only sm" (click)="editing.set(null)"><app-icon name="x" /></button></div>
+      <div class="modal-body">
+        <p class="muted small">Abre la cuenta en {{ label[a.network] }} y copia las cifras tal como aparecen (ej. 12500). Quedará marcado como "capturado a mano" con tu nombre y la fecha.</p>
+        <div class="field" style="max-width:240px"><label>Seguidores</label><input class="input" inputmode="numeric" [(ngModel)]="manualFollowers" placeholder="12500" /></div>
+        <div class="rows">
+          @for (r of manualRows; track $index) {
+            <div class="mrow">
+              <input class="input url" [(ngModel)]="r.url" placeholder="Enlace https://…" />
+              <input class="input" type="date" [(ngModel)]="r.date" />
+              <select class="select" [(ngModel)]="r.kind">@for (k of kinds; track k) { <option>{{ k }}</option> }</select>
+              <input class="input cap" [(ngModel)]="r.caption" maxlength="300" placeholder="De qué trata" />
+              <input class="input num" inputmode="numeric" [(ngModel)]="r.views" placeholder="Visitas" />
+              <input class="input num" inputmode="numeric" [(ngModel)]="r.likes" placeholder="Me gusta" />
+              <input class="input num" inputmode="numeric" [(ngModel)]="r.comments" placeholder="Coment." />
+              <input class="input num" inputmode="numeric" [(ngModel)]="r.shares" placeholder="Compart." />
+              <button class="btn ghost icon-only sm" title="Quitar" (click)="manualRows.splice($index, 1)"><app-icon name="trash" [size]="14" /></button>
+            </div>
+          }
+        </div>
+        @if (manualRows.length < 30) { <button class="btn sm" (click)="addRow()"><app-icon name="plus" [size]="14" /> Agregar publicación</button> }
+      </div>
+      <div class="modal-foot">
+        <button class="btn" (click)="editing.set(null)">Cancelar</button>
+        <button class="btn primary" [disabled]="saving()" (click)="saveManual()"><app-icon name="check" [size]="15" /> Guardar</button>
+      </div>
+    </div>
+  </div>
+}

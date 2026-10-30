@@ -8,20 +8,26 @@
  * La IA investiga en internet (búsqueda de Google) a partir del perfil del negocio.
  */
 
-export const MARKET_KINDS = ['competencia', 'redes', 'guiones', 'clientes'] as const;
+export const MARKET_KINDS = ['competencia', 'estadisticas', 'redes', 'guiones', 'clientes'] as const;
 export type MarketKind = (typeof MARKET_KINDS)[number];
 
 export const MARKET_KIND_LABEL: Record<MarketKind, string> = {
   competencia: 'Competencia y oportunidades',
   redes: 'Análisis de redes sociales',
+  estadisticas: 'Estadísticas reales de redes',
   guiones: 'Ideas de guiones',
   clientes: 'Clientes potenciales',
 };
 
 export interface Competitor {
   name: string;
-  /** Web o red social principal. */
+  /** Sitio web. */
   url?: string;
+  /** Cuentas confirmadas por una persona (de aquí salen las estadísticas reales). */
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  youtube?: string;
 }
 
 /** Lo que la IA necesita saber del negocio (lo llena el super admin o el administrador del cliente). */
@@ -36,6 +42,7 @@ export interface BusinessProfile {
   instagram?: string;
   facebook?: string;
   tiktok?: string;
+  youtube?: string;
   /** Cliente ideal ("gimnasios, conjuntos residenciales y hogares que entrenan en casa"). */
   idealCustomer: string;
   /** Qué los hace diferentes (garantía, envío gratis, financiación…). */
@@ -148,6 +155,21 @@ export interface PlanWeek {
   actions: string[];
 }
 
+/** Hallazgo de la IA sobre las estadísticas reales. */
+export interface StatsInsight {
+  title: string;
+  detail: string;
+}
+
+/** Publicación real que funcionó y cómo adaptarla (url = la de la publicación medida). */
+export interface Winner {
+  owner: string;
+  network: string;
+  url: string;
+  why: string;
+  adapt: string;
+}
+
 export interface Kpi {
   name: string;
   /** Meta a 30 días. */
@@ -203,6 +225,9 @@ export interface MarketReport {
   pillars?: ContentPillar[];
   plan?: PlanWeek[];
   kpis?: Kpi[];
+  /** Estadísticas reales: lo que interpreta la IA de los números medidos. */
+  insights?: StatsInsight[];
+  winners?: Winner[];
   scripts?: ScriptIdea[];
   leads?: Lead[];
   /** Páginas que consultó la IA. */

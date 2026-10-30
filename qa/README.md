@@ -8,6 +8,7 @@ cd qa && npm install          # una vez (puppeteer-core, usa el Chrome instalado
 sh restart.sh                 # base vacía + backend de QA
 node security.mjs final       # 59 pruebas de seguridad      → results/security-final.json
 sh restart.sh && node media.mjs   # fotos, videos e IA de imágenes → results/media.json
+SOCIAL_GRAPH_URL=http://localhost:3198/graph YOUTUBE_API_URL=http://localhost:3198/yt AI_BASE_URL=http://localhost:3198 sh restart.sh && node social.mjs   # estadísticas reales con APIs falsas → results/social.json
 AI_BASE_URL=http://localhost:3199 sh restart.sh && node market.mjs   # inteligencia de mercado con un Gemini falso → results/market.json
 sh restart.sh
 node conversations.mjs        # 12 conversaciones del bot      → results/conversations.json

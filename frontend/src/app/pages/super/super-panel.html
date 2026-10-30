@@ -133,6 +133,22 @@
         }
 
         @if (t.modules.market) {
+          <h3>Estadísticas reales de redes <small class="muted">(opcional: si se dejan vacías se usan las de la plataforma)</small></h3>
+          <div class="grid-2">
+            @for (k of socialFields; track k.id) {
+              <div class="field ai-key">
+                <label>{{ k.label }}</label>
+                <input class="input" type="password" [name]="'social-' + k.id" autocomplete="new-password" spellcheck="false" autocapitalize="off"
+                  [placeholder]="socialSaved()[k.id] && !socialRemove[k.id] ? '••••••••••••  (guardado)' : k.placeholder"
+                  [(ngModel)]="socialKey[k.id]" (copy)="$event.preventDefault()" (cut)="$event.preventDefault()" />
+                <small class="muted">
+                  @if (socialRemove[k.id]) { Se quitará al guardar. <a href="" (click)="$event.preventDefault(); socialRemove[k.id] = false">Deshacer</a> }
+                  @else if (socialSaved()[k.id]) { ✓ Guardado y cifrado. No se puede ver. <a href="" (click)="$event.preventDefault(); socialRemove[k.id] = true; socialKey[k.id] = ''">Quitar</a> }
+                  @else { {{ k.hint }} }
+                </small>
+              </div>
+            }
+          </div>
           <h3>Perfil del negocio <small class="muted">para la inteligencia de mercado (el cliente también puede editarlo)</small></h3>
           <app-business-profile-form [profile]="profileOf(t)" />
         }

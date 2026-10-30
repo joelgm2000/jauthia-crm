@@ -44,6 +44,10 @@ export class SuperPanel implements OnInit {
   readonly aiKeySaved = signal(false);
   aiKey = '';
   aiKeyRemove = false;
+  /** Token de Meta y clave de YouTube (estadísticas reales): mismo trato que la clave de IA, nunca se leen del servidor. */
+  readonly socialSaved = signal({ meta: false, youtube: false });
+  socialKey = { meta: '', youtube: '' };
+  socialRemove = { meta: false, youtube: false };
   readonly isNew = signal(false);
   flowTemplate: 'evosport' | 'generico' = 'generico';
   sampleCatalog = false;
@@ -104,6 +108,11 @@ export class SuperPanel implements OnInit {
     return base + (t.modules.aiImages ? ' + IA' : '') + (t.modules.market ? ' + Mercado' : '');
   }
 
+  readonly socialFields: { id: 'meta' | 'youtube'; label: string; placeholder: string; hint: string }[] = [
+    { id: 'meta', label: 'Token de Meta (Instagram y Facebook)', placeholder: 'Pega el token de acceso de Meta', hint: 'Permisos: instagram_basic, pages_show_list y pages_read_engagement. Se guarda cifrado.' },
+    { id: 'youtube', label: 'Clave de YouTube Data API', placeholder: 'Pega la clave de YouTube', hint: 'Gratis en Google Cloud (YouTube Data API v3). Se guarda cifrada.' },
+  ];
+
   /** Perfil del negocio del cliente en edición (se crea vacío la primera vez). */
   profileOf(t: Tenant): BusinessProfile {
     t.profile ??= structuredClone(EMPTY_PROFILE);
@@ -137,9 +146,9 @@ export class SuperPanel implements OnInit {
   }
 
   edit(t: TenantSummary): void {
-    const { users: _u, conversations: _c, lastActivityAt: _l, aiKeySaved, ...tenant } = t;
+    const { users: _u, conversations: _c, lastActivityAt: _l, aiKeySaved, socialKeysSaved, ...tenant } = t;
     this.isNew.set(false);
-    this.resetAiKey(aiKeySaved);
+    this.resetAiKey(aiKeySaved, socialKeysSaved);
     this.confirmDelete = '';
     this.editing.set(structuredClone(tenant));
   }
@@ -162,8 +171,11 @@ export class SuperPanel implements OnInit {
     };
     if (isNew) delete (payload as Partial<Tenant>).id;
     const aiApiKey = this.aiKeyRemove ? '' : this.aiKey.trim() || undefined;
+    const pick = (k: 'meta' | 'youtube') => (this.socialRemove[k] ? '' : this.socialKey[k].trim() || undefined);
+    const socialKeys = { metaToken: pick('meta'), youtubeKey: pick('youtube') };
     const { tenant } = await this.store.superCall('saveTenant', {
       tenant: payload, ...(isNew ? { flowTemplate: this.flowTemplate, sampleCatalog: this.sampleCatalog } : {}), ...(aiApiKey !== undefined ? { aiApiKey } : {}),
+      ...(socialKeys.metaToken !== undefined || socialKeys.youtubeKey !== undefined ? { socialKeys } : {}),
     });
     this.resetAiKey(false);
     if (isNew && this.adminEmail) {
@@ -176,10 +188,13 @@ export class SuperPanel implements OnInit {
   }
 
   /** La clave escrita solo vive en el formulario hasta guardar; nunca se lee del servidor. */
-  private resetAiKey(saved: boolean): void {
+  private resetAiKey(saved: boolean, social = { meta: false, youtube: false }): void {
     this.aiKey = '';
     this.aiKeyRemove = false;
     this.aiKeySaved.set(saved);
+    this.socialKey = { meta: '', youtube: '' };
+    this.socialRemove = { meta: false, youtube: false };
+    this.socialSaved.set(social);
   }
 
   async remove(): Promise<void> {

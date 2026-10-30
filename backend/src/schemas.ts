@@ -19,7 +19,7 @@ export const short = (n = 200) => z.string().max(n);
 export const url = z.string().max(1000).refine((u) => u === '' || u.startsWith('/') || /^https:\/\//.test(u), 'La URL debe ser https:// o una ruta del sitio');
 
 /** Web o red social: dirección http(s) o "@usuario". */
-const webRef = short(300).refine((u) => u === '' || /^@?[\w.-]{2,60}$/.test(u) || /^https?:\/\/[^\s]+$/.test(u), 'Usa una dirección https://… o @usuario').optional();
+const webRef = short(300).refine((u) => u === '' || /^@?[\w.-]{2,60}$/.test(u) || /^(https?:\/\/)?([\w-]+\.)+[a-z]{2,}(\/[^\s"<>]*)?$/i.test(u), 'Usa una dirección (ej. facebook.com/tupagina) o @usuario').optional();
 
 /** Perfil del negocio para la inteligencia de mercado. */
 export const businessProfile = z.object({
@@ -30,9 +30,10 @@ export const businessProfile = z.object({
   instagram: webRef,
   facebook: webRef,
   tiktok: webRef,
+  youtube: webRef,
   idealCustomer: short(600),
   differentiators: short(1000).optional(),
-  competitors: z.array(z.object({ name: short(120).min(1), url: webRef })).max(10),
+  competitors: z.array(z.object({ name: short(120).min(1), url: webRef, instagram: webRef, facebook: webRef, tiktok: webRef, youtube: webRef })).max(10),
 });
 const channelType = z.enum(Object.keys(CHANNEL_LABELS) as [ChannelType, ...ChannelType[]]);
 const stageId = z.enum(STAGES.map((s) => s.id) as [StageId, ...StageId[]]);
