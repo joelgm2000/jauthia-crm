@@ -31,7 +31,7 @@
             <div class="setup">
               @if (i.id === 'whatsapp') {
                 @if (c.coexistence && c.connected) { <p class="coex"><app-icon name="phone" [size]="14" /> <span><b>Coexistencia activa:</b> el número sigue funcionando en la app de WhatsApp Business del celular y también en el CRM.</span></p> }
-                @if (c.metaNotice; as n) { <div class="result"><app-icon name="info" [size]="15" /> {{ n.text }}</div> }
+                @if (c.metaNotice; as n) { <div class="result"><app-icon name="info" [size]="15" /> <span>{{ n.text }}</span></div> }
                 <div class="tabs wa-tabs">
                   <button [class.on]="waTab() === 'meta'" (click)="waTab.set('meta')">1 · Conectar mi número</button>
                   <button [class.on]="waTab() === 'test'" (click)="waTab.set('test')">Probar primero</button>
@@ -51,7 +51,7 @@
                     @if (s.ready) {
                       <button class="btn primary big-btn" [disabled]="!!waBusy()" (click)="connectMeta()"><app-icon name="plug" [size]="16" /> {{ waBusy() || 'Conectar con Meta' }}</button>
                     } @else {
-                      <div class="result"><app-icon name="info" [size]="15" /> La conexión con un clic aún no está activa en la plataforma (falta configurar la app de Meta de JAUTHIA). Mientras tanto puedes <a href="" (click)="$event.preventDefault(); waTab.set('test')">probar con el número de prueba</a> o usar la configuración manual.</div>
+                      <div class="result"><app-icon name="info" [size]="15" /> <span>La conexión con un clic aún no está activa en la plataforma (falta configurar la app de Meta de JAUTHIA). Mientras tanto puedes <a href="" (click)="$event.preventDefault(); waTab.set('test')">probar con el número de prueba</a> o usar la configuración manual.</span></div>
                     }
                   } @else { <p class="muted">Cargando…</p> }
                   @if (waDone(); as r) {
