@@ -33,7 +33,10 @@ export const businessProfile = z.object({
   youtube: webRef,
   idealCustomer: short(600),
   differentiators: short(1000).optional(),
-  competitors: z.array(z.object({ name: short(120).min(1), url: webRef, instagram: webRef, facebook: webRef, tiktok: webRef, youtube: webRef })).max(10),
+  competitors: z.array(z.object({
+    name: short(120).min(1), url: webRef, instagram: webRef, facebook: webRef, tiktok: webRef, youtube: webRef,
+    autoFound: z.array(z.enum(['instagram', 'facebook', 'tiktok'])).max(3).optional(),
+  })).max(10),
 });
 const channelType = z.enum(Object.keys(CHANNEL_LABELS) as [ChannelType, ...ChannelType[]]);
 const stageId = z.enum(STAGES.map((s) => s.id) as [StageId, ...StageId[]]);

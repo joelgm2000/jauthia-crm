@@ -3,15 +3,17 @@
  *
  *  - Instagram: Business Discovery de la API oficial de Meta (cuentas de empresa o creador).
  *  - Facebook: páginas públicas por la API oficial de Meta. Las publicaciones de páginas ajenas requieren que Meta
- *    apruebe "Page Public Content Access" en la app; sin ese permiso se leen los seguidores y las publicaciones
- *    se capturan a mano.
+ *    apruebe "Page Public Content Access" en la app; sin ese permiso solo se leen los seguidores.
  *  - YouTube: YouTube Data API v3.
- *  - TikTok: no hay API oficial para ver cuentas ajenas → captura manual.
+ *  - TikTok: no ofrece una forma gratuita de leer cuentas ajenas; solo se guarda la cuenta.
+ * Nadie escribe cifras a mano. Cada lectura se une a las anteriores con mergeReading (shared/social.ts).
  *
  * Solo se consultan las cuentas que una persona escribió en el perfil del negocio (nunca se adivinan).
  * Los tokens se guardan cifrados (secrets.ts) y nunca llegan al navegador. Se guarda en settings, clave "social".
  */
-import { NETWORK_LABEL, accountKey, API_NETWORKS, ManualCapture, normalizeHandle, SOCIAL_NETWORKS, SocialAccount, SocialConnections, SocialNetwork, SocialPost, SocialStatsData } from '../../shared/social';
+import {
+  accountKey, API_NETWORKS, mergeReading, normalizeHandle, SOCIAL_NETWORKS, SocialAccount, SocialConnections, SocialNetwork, SocialPost, SocialStatsData,
+} from '../../shared/social';
 import { BusinessProfile } from '../../shared/market';
 import { Tenant } from '../../shared/models';
 import { DAY, HOUR } from '../../shared/time';
@@ -33,12 +35,37 @@ interface Stored {
   lastRefresh?: number;
   /** Momentos de las últimas actualizaciones (para el tope diario). */
   refreshLog: number[];
+  /** Momentos de las últimas búsquedas de cuentas con IA (tope diario). */
+  discoverLog?: number[];
+}
+
+const DISCOVER_PER_DAY = 3;
+
+/** Reserva una búsqueda de cuentas de hoy (false si ya no quedan). */
+export function takeDiscoverSlot(tenantId: string, now = Date.now()): Promise<boolean> {
+  return withLock(tenantId, async () => {
+    const s = await load(tenantId);
+    const log = (s.discoverLog ?? []).filter((t) => now - t < DAY);
+    if (log.length >= DISCOVER_PER_DAY) return false;
+    await save(tenantId, { ...s, discoverLog: [...log, now] });
+    return true;
+  });
 }
 
 async function load(tenantId: string): Promise<Stored> {
   const r = await pool.query('SELECT data FROM settings WHERE tenant_id = $1 AND key = $2', [tenantId, SETTING_KEY]);
   const d = r.rows[0]?.data as Partial<Stored> | undefined;
-  return { accounts: d?.accounts ?? {}, lastRefresh: d?.lastRefresh, refreshLog: d?.refreshLog ?? [] };
+  return { accounts: d?.accounts ?? {}, lastRefresh: d?.lastRefresh, refreshLog: d?.refreshLog ?? [], discoverLog: d?.discoverLog ?? [] };
+}
+
+/** Una escritura a la vez por cliente (la actualización y la búsqueda de cuentas escriben en el mismo lugar). */
+const locks = new Map<string, Promise<unknown>>();
+function withLock<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = locks.get(tenantId) ?? Promise.resolve();
+  const run = prev.catch(() => undefined).then(fn);
+  locks.set(tenantId, run);
+  void run.finally(() => locks.get(tenantId) === run && locks.delete(tenantId)).catch(() => undefined);
+  return run;
 }
 
 async function save(tenantId: string, s: Stored): Promise<void> {
@@ -78,6 +105,8 @@ export function wantedAccounts(profile: BusinessProfile | undefined): Wanted[] {
 }
 
 function view(w: Wanted, stored: SocialAccount | undefined): SocialAccount {
+  // Datos escritos a mano en versiones anteriores: ya no se aceptan.
+  if ((stored as { source?: string } | undefined)?.source === 'manual') stored = undefined;
   return { ...(stored ?? { posts: [], history: [] }), key: accountKey(w.network, w.handle), network: w.network, handle: w.handle, owner: w.owner, isSelf: w.isSelf };
 }
 
@@ -236,7 +265,11 @@ function pushHistory(a: SocialAccount, now: number): void {
 }
 
 /** Lee todas las cuentas con API disponible. Devuelve cuántas se leyeron y cuántas fallaron. */
-export async function refreshSocial(tenant: Tenant, now = Date.now()): Promise<{ ok: number; failed: number }> {
+export function refreshSocial(tenant: Tenant, now = Date.now()): Promise<{ ok: number; failed: number }> {
+  return withLock(tenant.id, () => refreshLocked(tenant, now));
+}
+
+async function refreshLocked(tenant: Tenant, now: number): Promise<{ ok: number; failed: number }> {
   const stored = await load(tenant.id);
   const keys = await keysFor(tenant.id);
   let igUserId = keys.igUserId;
@@ -269,12 +302,8 @@ export async function refreshSocial(tenant: Tenant, now = Date.now()): Promise<{
         got = await fetchYoutube(w.handle, keys.youtubeKey);
       }
       const { postsUnavailable, ...data } = got;
-      // Sin permiso de publicaciones en Facebook se conservan las capturadas a mano.
-      const keepManual = postsUnavailable && prev.source === 'manual' && prev.posts.length;
-      const next: SocialAccount = {
-        ...prev, ...data, posts: keepManual ? prev.posts : data.posts ?? [], source: keepManual ? 'manual' : 'api', fetchedAt: now, by: keepManual ? prev.by : undefined,
-        error: postsUnavailable ? 'Seguidores: dato real de Meta. Meta aún no autoriza leer las publicaciones de páginas ajenas (permiso "Page Public Content Access"); puedes capturarlas a mano.' : undefined,
-      };
+      const next = mergeReading(prev, { name: data.name, followers: data.followers, postsCount: data.postsCount, posts: data.posts ?? [] }, now);
+      if (postsUnavailable) next.error = 'Seguidores: dato real de Meta. Las publicaciones de páginas ajenas aparecen cuando Meta apruebe el permiso "Page Public Content Access" de tu app.';
       pushHistory(next, now);
       stored.accounts[key] = next;
       ok++;
@@ -301,23 +330,6 @@ export async function socialData(tenant: Tenant, now = Date.now()): Promise<Soci
     lastRefresh: stored.lastRefresh,
     refreshesLeft: Math.max(0, REFRESHES_PER_DAY - stored.refreshLog.filter((t) => now - t < DAY).length),
   };
-}
-
-/** Guarda lo que una persona copió de una red (TikTok, o Facebook mientras Meta no autorice las publicaciones). */
-export async function saveManual(tenant: Tenant, cap: ManualCapture, by: string, now = Date.now()): Promise<SocialAccount> {
-  const w = wantedAccounts(tenant.profile).find((x) => x.network === cap.network && x.handle === normalizeHandle(cap.network, cap.handle));
-  if (!w) throw new SocialError(`Primero agrega esa cuenta de ${NETWORK_LABEL[cap.network]} en el perfil del negocio`);
-  const stored = await load(tenant.id);
-  const key = accountKey(w.network, w.handle);
-  const prev = view(w, stored.accounts[key]);
-  const next: SocialAccount = {
-    ...prev, followers: cap.followers ?? prev.followers, source: 'manual', by, fetchedAt: now, error: undefined,
-    posts: cap.posts.map((p, i) => ({ ...p, id: `m${i}-${p.date}` })).sort((a, b) => b.date - a.date),
-  };
-  pushHistory(next, now);
-  stored.accounts[key] = next;
-  await save(tenant.id, stored);
-  return next;
 }
 
 export { SocialError };

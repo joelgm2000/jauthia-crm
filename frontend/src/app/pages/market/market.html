@@ -34,7 +34,7 @@
 
       @if (t === 'estadisticas') {
         <h2 class="print-only">{{ kindLabel.estadisticas }}</h2>
-        <app-market-stats [admin]="auth.isAdmin()" [printing]="printing()" (pdf)="downloadStatsPdf()" (ready)="statsReady.set($event)" />
+        <app-market-stats [admin]="auth.isAdmin()" [printing]="printing()" (pdf)="downloadStatsPdf()" (ready)="statsReady.set($event)" (profileChanged)="reloadProfile()" />
         <h3 class="sec ai-title"><app-icon name="sparkles" [size]="16" /> Lo que dicen los números (interpretación de la IA)</h3>
       }
 
@@ -301,6 +301,10 @@
 
         <!-- ============ Clientes potenciales ============ -->
         @if (t === 'clientes') {
+          @if (r.leads?.[0]?.verified !== undefined) {
+            <p class="verify"><app-icon name="checks" [size]="15" />
+              <span><b>Revisados dos veces.</b> Una segunda búsqueda independiente confirmó {{ r.leads!.length }} negocio(s){{ r.discarded ? ' y descartó ' + r.discarded + ' que no pudo encontrar' : '' }}. ✓ = dato encontrado en las dos búsquedas.</span></p>
+          }
           <div class="row wrap export no-print">
             <div class="seg">
               <button [class.on]="minFit() === 0" (click)="minFit.set(0)">Todos</button>
@@ -323,6 +327,7 @@
                   <div><b>{{ l.name }}</b><small class="muted">{{ l.type }}{{ l.city ? ' · ' + l.city : '' }}</small></div>
                   <span class="stars" [title]="'Qué tan buen prospecto es: ' + l.fit + ' de 5'">{{ stars(l.fit) }}</span>
                 </div>
+                @if (l.verified) { <span class="vbadge" title="Una segunda búsqueda independiente encontró este negocio">✓ Verificado 2 veces</span> }
                 <p>{{ l.why }}</p>
                 <div class="approach">
                   <small>Mensaje sugerido</small>
@@ -331,14 +336,14 @@
                 <div class="row wrap gap-6">
                   <button class="btn sm no-print" (click)="copy(l.approach)"><app-icon name="copy" [size]="13" /> Copiar mensaje</button>
                   @if (waLink(l); as wa) { <a class="btn sm no-print" [href]="wa" target="_blank" rel="noopener noreferrer"><app-icon name="phone" [size]="13" /> WhatsApp</a> }
-                  @if (l.instagram) { <a class="btn sm" [href]="l.instagram" target="_blank" rel="noopener noreferrer nofollow"><app-icon name="external" [size]="13" /> Instagram</a> }
-                  @if (l.website) { <a class="btn sm" [href]="l.website" target="_blank" rel="noopener noreferrer nofollow"><app-icon name="external" [size]="13" /> Web</a> }
-                  @if (l.phone) { <span class="muted phone">{{ l.phone }}</span> }
+                  @if (l.instagram) { <a class="btn sm" [href]="l.instagram" target="_blank" rel="noopener noreferrer nofollow" [title]="checkTitle(l, 'instagram')"><app-icon name="external" [size]="13" /> Instagram {{ checkMark(l, 'instagram') }}</a> }
+                  @if (l.website) { <a class="btn sm" [href]="l.website" target="_blank" rel="noopener noreferrer nofollow" [title]="checkTitle(l, 'website')"><app-icon name="external" [size]="13" /> Web {{ checkMark(l, 'website') }}</a> }
+                  @if (l.phone) { <span class="phone" [class.muted]="l.checks?.phone !== 'ok'" [title]="checkTitle(l, 'phone')">{{ l.phone }} {{ checkMark(l, 'phone') }}</span> }
                 </div>
               </div>
             } @empty { <p class="muted">Ningún prospecto con ese filtro.</p> }
           </div>
-          <p class="muted note">Son datos públicos de empresas encontrados en internet: verifícalos antes de contactar y respeta a quien no quiera recibir mensajes.</p>
+          <p class="muted note">Son datos públicos de empresas encontrados en internet y revisados dos veces. "Sin confirmar" (⚠) = solo lo encontró una de las dos búsquedas. Respeta a quien no quiera recibir mensajes.</p>
         }
 
         @if (r.sources.length) {

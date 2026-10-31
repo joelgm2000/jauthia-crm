@@ -28,6 +28,8 @@ export interface Competitor {
   facebook?: string;
   tiktok?: string;
   youtube?: string;
+  /** Redes cuya cuenta encontró la IA (confirmada en 3 búsquedas distintas). */
+  autoFound?: ('instagram' | 'facebook' | 'tiktok')[];
 }
 
 /** Lo que la IA necesita saber del negocio (lo llena el super admin o el administrador del cliente). */
@@ -204,7 +206,15 @@ export interface Lead {
   approach: string;
   /** Qué tan buen prospecto es (1 a 5). */
   fit: number;
+  /** Una segunda búsqueda independiente confirmó que el negocio existe. */
+  verified?: boolean;
+  /** Por dato: "ok" = lo encontraron las dos búsquedas; "once" = solo una (sin confirmar). */
+  checks?: Partial<Record<LeadField, 'ok' | 'once'>>;
+  /** El sitio web respondió cuando el servidor lo abrió. */
+  webOnline?: boolean;
 }
+
+export type LeadField = 'website' | 'phone' | 'instagram';
 
 export interface MarketReport {
   id: string;
@@ -230,6 +240,8 @@ export interface MarketReport {
   winners?: Winner[];
   scripts?: ScriptIdea[];
   leads?: Lead[];
+  /** Clientes potenciales que la segunda búsqueda no pudo confirmar (se descartaron). */
+  discarded?: number;
   /** Páginas que consultó la IA. */
   sources: MarketSource[];
 }

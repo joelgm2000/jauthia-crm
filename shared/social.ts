@@ -5,8 +5,8 @@
  *  - Facebook: API oficial de Meta (páginas públicas; las publicaciones requieren que Meta apruebe
  *    "Page Public Content Access" en la app).
  *  - YouTube: API oficial de Google (YouTube Data API v3).
- *  - TikTok (y cualquier red sin API disponible): captura manual de una persona.
- * Cada cifra guarda su fuente y fecha. La IA solo interpreta estos números: nunca los inventa.
+ *  - TikTok: no ofrece una forma gratuita de leer cuentas ajenas; la cuenta se guarda para cuando haya cómo medirla.
+ * Nadie escribe cifras a mano. Cada cifra guarda su fuente y fecha. La IA solo interpreta estos números: nunca los inventa.
  */
 
 export const SOCIAL_NETWORKS = ['instagram', 'facebook', 'youtube', 'tiktok'] as const;
@@ -19,7 +19,7 @@ export const NETWORK_LABEL: Record<SocialNetwork, string> = {
   tiktok: 'TikTok',
 };
 
-/** Redes que se leen solas con una API oficial (las demás, a mano). */
+/** Redes que se leen solas con una API oficial. */
 export const API_NETWORKS: SocialNetwork[] = ['instagram', 'facebook', 'youtube'];
 
 export interface SocialPost {
@@ -48,15 +48,12 @@ export interface SocialAccount {
   followers?: number;
   /** Publicaciones totales de la cuenta. */
   postsCount?: number;
-  source?: 'api' | 'manual';
-  /** Cuándo se leyeron (o capturaron) los datos. */
+  /** Última lectura con la API oficial. */
   fetchedAt?: number;
-  /** Quién los capturó a mano. */
-  by?: string;
   posts: SocialPost[];
   /** Seguidores a lo largo del tiempo (para ver el crecimiento). */
   history: { at: number; followers: number }[];
-  /** Por qué no se pudieron leer (cuenta privada, no es de empresa, permiso de Meta pendiente…). */
+  /** Por qué la API no pudo leerla (cuenta privada, no es de empresa, permiso de Meta pendiente…). */
   error?: string;
 }
 
@@ -74,12 +71,56 @@ export interface SocialStatsData {
   refreshesLeft: number;
 }
 
-/** Captura manual de una cuenta (PUT /api/market/social/manual). */
-export interface ManualCapture {
-  network: SocialNetwork;
+/** Cuenta encontrada por la búsqueda triple de la IA. votes = en cuántas de las 3 búsquedas apareció. */
+export interface FoundAccount {
+  owner: string;
+  network: 'instagram' | 'facebook' | 'tiktok';
   handle: string;
-  followers?: number;
-  posts: Omit<SocialPost, 'id'>[];
+  votes: number;
+}
+
+/** Resultado de "Buscar cuentas con IA": las confirmadas (3/3) ya quedaron en el perfil; las dudosas (2/3) esperan visto bueno. */
+export interface DiscoverResult {
+  confirmed: FoundAccount[];
+  doubtful: FoundAccount[];
+  searched: number;
+}
+
+/** Clave de una publicación para reconocerla entre una lectura y otra. */
+export function postKey(p: Pick<SocialPost, 'id' | 'url'>): string {
+  const u = p.url ?? '';
+  const ig = u.match(/instagram\.com\/(?:[^/?#]+\/)?(?:p|reel|reels|tv)\/([\w-]+)/i);
+  if (ig) return 'ig:' + ig[1];
+  const yt = u.match(/[?&]v=([\w-]{6,20})/);
+  if (yt) return 'yt:' + yt[1];
+  if (/facebook\.com/i.test(u)) return 'fb:' + u.replace(/[?#].*$/, '').replace(/\/+$/, '').replace(/^https?:\/\/(www\.|m\.)?/i, '').toLowerCase();
+  return 'id:' + p.id;
+}
+
+const KEEP_POSTS = 30;
+
+/**
+ * Agrega una lectura de la API a la cuenta: une las publicaciones por su enlace (actualiza las cifras de las que
+ * ya estaban y conserva las anteriores) y guarda solo las 30 más recientes.
+ */
+export function mergeReading(prev: SocialAccount, reading: { name?: string; followers?: number; postsCount?: number; posts: SocialPost[] }, now: number): SocialAccount {
+  const posts = new Map(prev.posts.map((x) => [postKey(x), x]));
+  for (const p of reading.posts) {
+    const k = postKey(p);
+    const old = posts.get(k);
+    // Lo vacío no borra lo que ya se sabía.
+    const fresh = Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined && v !== '')) as SocialPost;
+    posts.set(k, old ? { ...old, ...fresh, id: old.id } : fresh);
+  }
+  return {
+    ...prev,
+    name: reading.name ?? prev.name,
+    followers: reading.followers ?? prev.followers,
+    postsCount: reading.postsCount ?? prev.postsCount,
+    posts: [...posts.values()].sort((a, b) => b.date - a.date).slice(0, KEEP_POSTS),
+    fetchedAt: now,
+    error: undefined,
+  };
 }
 
 const PATTERNS: Record<SocialNetwork, RegExp[]> = {

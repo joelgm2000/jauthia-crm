@@ -1,4 +1,5 @@
-// Estadísticas REALES de redes sobre una instancia de QA con APIs FALSAS de Meta, YouTube y Gemini (no gasta nada):
+// Estadísticas REALES de redes (APIs oficiales + búsqueda triple de cuentas) sobre una instancia de QA con APIs
+// FALSAS de Meta, YouTube y Gemini (no gasta nada):
 //   SOCIAL_GRAPH_URL=http://localhost:3198/graph YOUTUBE_API_URL=http://localhost:3198/yt AI_BASE_URL=http://localhost:3198 sh restart.sh && node social.mjs
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
@@ -86,6 +87,17 @@ const mock = createServer((req, res) => {
       ] });
     }
     if (u.pathname.includes(':generateContent')) {
+      const prompt = JSON.parse(raw || '{}').contents?.[0]?.parts?.[0]?.text ?? '';
+      const who = prompt.match(/perfiles OFICIALES de la empresa "([^"]+)"/)?.[1];
+      if (who) {
+        const v = prompt.includes(' · ') ? 2 : prompt.includes('redes sociales') ? 3 : 1;
+        const found = who === 'EvoSport'
+          ? { facebook: 'https://www.facebook.com/evosportco', tiktok: '@inventado_sin_enlace' }
+          : who === 'Fitness Costa'
+            ? { tiktok: v === 3 ? 'https://www.tiktok.com/@otra_cuenta' : 'https://www.tiktok.com/@fitnesscosta' }
+            : {};
+        return send(res, 200, { candidates: [{ content: { parts: [{ text: JSON.stringify(found) }] } }] });
+      }
       const answer = {
         summary: 'Los videos cortos de la competencia triplican la interacción.',
         insights: [{ title: 'Los Shorts ganan', detail: 'El Short de 45 s tiene 52.000 visitas.' }],
@@ -142,7 +154,7 @@ const r1 = await call('/api/market/social/refresh', { method: 'POST', jar: 'adm'
 const acc = (k) => r1.json?.data?.accounts?.find((a) => a.key === k);
 check('Actualiza: 5 cuentas leídas y 1 con problema', r1.status === 200 && r1.json.ok === 5 && r1.json.failed === 1, r1.text.slice(0, 200));
 const ig = acc('instagram:gymstore');
-check('Instagram: seguidores y publicaciones reales', ig?.followers === 12650 && ig.postsCount === 340 && ig.posts.length === 3 && ig.source === 'api', JSON.stringify(ig)?.slice(0, 200));
+check('Instagram: seguidores y publicaciones reales', ig?.followers === 12650 && ig.postsCount === 340 && ig.posts.length === 3 && !!ig.fetchedAt, JSON.stringify(ig)?.slice(0, 200));
 check('Instagram: Reel con me gusta y comentarios', ig?.posts[0].kind === 'Reel' && ig.posts[0].likes === 940 && ig.posts[0].comments === 61);
 check('Instagram: me gusta ocultos quedan vacíos (no 0 inventado)', ig?.posts[1].likes === undefined && ig.posts[1].comments === 12);
 check('Instagram: enlace javascript: descartado', ig?.posts[2].url === undefined);
@@ -155,26 +167,28 @@ const fb2 = acc('facebook:fitnesscosta');
 check('Facebook con permiso: reacciones, comentarios y compartidos', fb2?.posts[0]?.likes === 310 && fb2.posts[0].comments === 120 && fb2.posts[0].shares === 44);
 const yt = acc('youtube:@gymstore');
 check('YouTube: suscriptores y visitas reales; Short detectado', yt?.followers === 2300 && yt.posts.find((p) => p.id === 'vid000002')?.views === 52000 && yt.posts.find((p) => p.id === 'vid000002')?.kind === 'Short', JSON.stringify(yt)?.slice(0, 200));
-check('TikTok no se consulta (queda para captura manual)', !acc('tiktok:gymstore')?.fetchedAt);
+check('TikTok no se consulta (no hay forma gratuita)', !acc('tiktok:gymstore')?.fetchedAt);
+check('Ya no existe la captura a mano', (await call('/api/market/social/manual', { method: 'PUT', jar: 'adm', body: { network: 'tiktok', handle: '@gymstore', posts: [] } })).status === 404);
 
-console.log('\nCaptura manual');
-const man = (body, jar = 'adm') => call('/api/market/social/manual', { method: 'PUT', jar, body });
-const ttPost = { url: 'https://www.tiktok.com/@gymstore/video/7300000000', date: Date.UTC(2026, 9, 22), kind: 'Video', caption: 'Unboxing', views: 125000, likes: 8400, comments: 312, shares: 90 };
-check('Enlace javascript: rechazado', (await man({ network: 'tiktok', handle: '@gymstore', posts: [{ ...ttPost, url: 'javascript:alert(1)' }] })).status === 400);
-check('Cuenta que no está en el perfil: 400', (await man({ network: 'tiktok', handle: '@otro', posts: [ttPost] })).status === 400);
-check('Un asesor no puede capturar (403)', (await man({ network: 'tiktok', handle: '@gymstore', posts: [ttPost] }, 'ase')).status === 403);
-const m1 = await man({ network: 'tiktok', handle: '@gymstore', followers: 8800, posts: [ttPost] });
-check('TikTok capturado a mano con autor y fecha', m1.status === 200 && m1.json.account.source === 'manual' && m1.json.account.by === 'Usuario adm' && m1.json.account.posts[0].views === 125000, m1.text.slice(0, 200));
-await man({ network: 'facebook', handle: 'https://www.facebook.com/gymstorevalle', posts: [{ date: Date.UTC(2026, 9, 10), kind: 'Publicación', caption: 'Promo', likes: 77, comments: 5, shares: 2 }] });
-
-console.log('\nSegunda lectura');
+console.log('\nSegunda lectura de la API');
 const r2 = await call('/api/market/social/refresh', { method: 'POST', jar: 'adm', body: {} });
 const ig2 = r2.json?.data?.accounts?.find((a) => a.key === 'instagram:gymstore');
-check('Guarda el historial de seguidores (para ver el crecimiento)', ig2?.history?.length === 2 && ig2.history[1].followers - ig2.history[0].followers === 150, JSON.stringify(ig2?.history));
-const fb3 = r2.json?.data?.accounts?.find((a) => a.key === 'facebook:gymstorevalle');
-check('Facebook sin permiso conserva lo capturado a mano', fb3?.posts?.length === 1 && fb3.source === 'manual' && fb3.followers === 5600, JSON.stringify(fb3)?.slice(0, 200));
-check('La captura manual de TikTok no se borra al actualizar', r2.json?.data?.accounts?.find((a) => a.key === 'tiktok:gymstore')?.posts?.length === 1);
-check('Quedan 6 actualizaciones hoy', r2.json?.data?.refreshesLeft === 6, r2.json?.data?.refreshesLeft);
+check('Guarda el historial de seguidores (para ver el crecimiento)', ig2?.history?.length >= 2 && ig2.history.at(-1).followers === 12800, JSON.stringify(ig2?.history));
+check('Une las lecturas: actualiza las cifras sin duplicar publicaciones', ig2?.posts?.length === 3, ig2?.posts?.length);
+check('Quedan 6 actualizaciones de API hoy', r2.json?.data?.refreshesLeft === 6, r2.json?.data?.refreshesLeft);
+
+console.log('\nBuscar cuentas con IA (3 búsquedas por empresa)');
+const before0 = seen.length;
+const dsc = await call('/api/market/social/discover', { method: 'POST', jar: 'adm', body: {} });
+const searches = seen.slice(before0).filter((x) => x.path.includes(':generateContent'));
+check('Busca 3 veces cada empresa a la que le falta alguna cuenta (EvoSport y Fitness Costa)', dsc.status === 200 && dsc.json.searched === 2 && searches.length === 6, `${dsc.status} ${searches.length} ${dsc.text.slice(0, 200)}`);
+check('Las 3 búsquedas son distintas y usan la búsqueda de Google', new Set(searches.map((x) => JSON.parse(x.body).contents[0].parts[0].text.match(/«(.+)»/)?.[1])).size === 6 && searches.every((x) => JSON.parse(x.body).tools));
+check('Cuenta que aparece en las 3 búsquedas: confirmada y guardada en el perfil', dsc.json?.confirmed?.length === 1 && dsc.json.confirmed[0].handle === 'evosportco' && dsc.json.profile.facebook === 'evosportco', JSON.stringify(dsc.json?.confirmed));
+check('Cuenta que aparece en 2 de 3: queda por confirmar (no se guarda sola)', dsc.json?.doubtful?.length === 1 && dsc.json.doubtful[0].handle === 'fitnesscosta' && dsc.json.doubtful[0].votes === 2 && !dsc.json.profile.competitors.find((c) => c.name === 'Fitness Costa').tiktok);
+check('"@usuario" sin enlace real se descarta (no se adivina)', !JSON.stringify(dsc.json).includes('inventado'));
+const acc2 = await call('/api/market/social/accept', { method: 'POST', jar: 'adm', body: { owner: 'Fitness Costa', network: 'tiktok', handle: 'fitnesscosta' } });
+check('"Es correcta": la cuenta dudosa se agrega y queda marcada como encontrada por IA', acc2.status === 200 && acc2.json.profile.competitors.find((c) => c.name === 'Fitness Costa')?.autoFound?.includes('tiktok'));
+check('Las cuentas nuevas pasan a medirse', (await call('/api/market/social', { jar: 'adm' })).json?.accounts?.some((a) => a.key === 'tiktok:fitnesscosta'));
 
 console.log('\nInterpretación con IA (sin búsqueda, solo números reales)');
 const before = seen.length;
@@ -184,17 +198,17 @@ const aiBody = JSON.parse(ai?.body ?? '{}');
 check('Genera la interpretación', st.status === 200 && st.json.report.insights.length === 1, st.text.slice(0, 200));
 check('No usa la búsqueda de Google (solo los datos medidos)', !aiBody.tools);
 const prompt = aiBody.contents?.[0]?.parts?.[0]?.text ?? '';
-check('Le pasa las cifras reales (52000 visitas, 940 me gusta, captura manual)', prompt.includes('visitas 52000') && prompt.includes('me gusta 940') && prompt.includes('captura manual'));
+check('Le pasa las cifras reales con su fuente (52000 visitas de YouTube, 940 me gusta de Instagram)', prompt.includes('visitas 52000') && prompt.includes('me gusta 940') && prompt.includes('API oficial'));
 check('Descarta publicaciones que la IA inventó (solo enlaces medidos)', st.json?.report?.winners?.length === 1 && st.json.report.winners[0].url.endsWith('vid000002'), JSON.stringify(st.json?.report?.winners));
-const rd = await call('/api/market/run', { method: 'POST', jar: 'adm', body: { kind: 'redes' } });
+const rdr = await call('/api/market/run', { method: 'POST', jar: 'adm', body: { kind: 'redes' } });
 const rdPrompt = JSON.parse(seen.at(-1).body).contents[0].parts[0].text;
 check('Redes: solo las cuentas del perfil y sin cifras de la IA', rdPrompt.includes('SOLO las cuentas que aparecen en el perfil') && rdPrompt.includes('NO des cifras'));
-check('Redes: seguidores tomados del dato real (no "1 millón" de la IA)', rd.json?.report?.channels?.[0]?.audience === '4.200 seguidores (dato real)' && !rd.text.includes('millón'), rd.json?.report?.channels?.[0]?.audience);
+check('Redes: seguidores tomados del dato real (no "1 millón" de la IA)', rdr.json?.report?.channels?.[0]?.audience === '4.200 seguidores (dato real)' && !rdr.text.includes('millón'), rdr.json?.report?.channels?.[0]?.audience);
 
 console.log('\nAislamiento');
 const other = await call('/api/market/social', { jar: 'otro' });
-check('Otro cliente no ve las estadísticas de EvoSport', other.status === 200 && other.json.accounts.length === 0);
-check('El asesor puede ver las estadísticas', (await call('/api/market/social', { jar: 'ase' })).json?.accounts?.length === 8);
+check('Otro cliente no ve las estadísticas de EvoSport', other.status === 200 && other.json.accounts.length === 0 && !JSON.stringify(other.json).includes('gymstore'));
+check('El asesor puede ver las estadísticas', (await call('/api/market/social', { jar: 'ase' })).json?.accounts?.length >= 8);
 const boot = await call('/api/bootstrap', { jar: 'adm' });
 check('Los tokens nunca viajan al navegador', !boot.text.includes(META) && !boot.text.includes(YT) && !(await call('/api/market/social', { jar: 'adm' })).text.includes(META));
 

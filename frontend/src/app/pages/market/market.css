@@ -174,3 +174,10 @@
 @media print {
   .print-only { display: block; font-size: 20px; margin: 0 0 8px; }
 }
+
+/* ---------- Clientes potenciales revisados dos veces ---------- */
+.verify { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; font-size: 13px; background: rgba(22, 163, 74, .1); color: #15803d; border-radius: 10px; padding: 8px 12px; }
+.verify app-icon { margin-top: 2px; flex: none; }
+.vbadge { align-self: flex-start; font-size: 11px; font-weight: 700; background: rgba(22, 163, 74, .12); color: #15803d; border-radius: 6px; padding: 2px 8px; }
+.export .select { width: auto; max-width: 240px; }
+@media (max-width: 640px) { .export .select { max-width: none; flex: 1 1 100%; } }

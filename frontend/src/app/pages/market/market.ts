@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BusinessProfile, EMPTY_PROFILE, Lead, Level, MARKET_KIND_LABEL, MarketData, MarketKind, MarketReport, Opportunity, profileMissing, ScriptIdea } from '@shared/market';
+import { BusinessProfile, EMPTY_PROFILE, Lead, LeadField, Level, MARKET_KIND_LABEL, MarketData, MarketKind, MarketReport, Opportunity, profileMissing, ScriptIdea } from '@shared/market';
 import { AuthService } from '../../core/auth.service';
 import { CrmStore } from '../../core/data/crm-store';
 import { api } from '../../core/http';
@@ -111,6 +111,17 @@ export class Market implements OnInit {
     }
   }
 
+  /** La búsqueda de cuentas con IA cambió el perfil: se actualiza sin recargar la página. */
+  async reloadProfile(): Promise<void> {
+    if (this.profileDirty()) return; // no pisar lo que el usuario está editando
+    try {
+      const d = await api<MarketData>('/api/market');
+      this.profile.set({ ...structuredClone(EMPTY_PROFILE), ...d.profile, competitors: d.profile.competitors ?? [] });
+    } catch {
+      /* se verá al volver a entrar */
+    }
+  }
+
   history(kind: MarketKind): MarketReport[] {
     return this.reports().filter((r) => r.kind === kind);
   }
@@ -180,6 +191,16 @@ export class Market implements OnInit {
   /** "27 oct, 10:15 a. m." (o con el mes completo). */
   when(ts: number, long = false): string {
     return new Date(ts).toLocaleString('es-CO', { day: 'numeric', month: long ? 'long' : 'short', hour: 'numeric', minute: '2-digit' });
+  }
+
+  /** ✓ si las dos búsquedas encontraron el dato; ⚠ si solo una. */
+  checkMark(l: Lead, f: LeadField): string {
+    return l.checks?.[f] === 'ok' ? '✓' : l.checks?.[f] === 'once' ? '⚠' : '';
+  }
+
+  checkTitle(l: Lead, f: LeadField): string {
+    const web = f === 'website' && l.webOnline ? ' La página abrió correctamente.' : '';
+    return l.checks?.[f] === 'ok' ? 'Confirmado: lo encontraron las dos búsquedas.' + web : l.checks?.[f] === 'once' ? 'Sin confirmar: solo lo encontró una de las dos búsquedas.' + web : '';
   }
 
   stars(n: number): string {

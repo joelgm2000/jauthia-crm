@@ -78,8 +78,17 @@ const ANSWERS = {
     leads: [
       { name: 'Gimnasio Titanes', type: 'Gimnasio', city: 'Valledupar', website: 'javascript:fetch(1)', phone: '+57 300 123 4567<script>', instagram: '@titanes_gym', why: 'Abrió sede nueva', approach: 'Hola, vimos su nueva sede…', fit: 9 },
       { name: 'Hotel Sicarare', type: 'Hotel', city: 'Valledupar', website: 'https://hotel.example.com', phone: '', instagram: 'no es un enlace', why: 'Tiene gimnasio', approach: 'Hola…', fit: 'x' },
+      { name: 'Negocio Fantasma', type: 'Gimnasio', city: 'Valledupar', website: 'https://fantasma.example.com', phone: '3009999999', instagram: '', why: 'x', approach: 'x', fit: 4 },
+      { name: 'Servidor Interno', type: 'Club', city: 'Valledupar', website: 'http://127.0.0.1:3199/sitio-interno', phone: '', instagram: '', why: 'x', approach: 'x', fit: 3 },
     ],
   },
+};
+/** Segunda búsqueda (verificador): confirma, contradice y no encuentra. */
+const SECOND = {
+  'Gimnasio Titanes': { exists: true, website: 'https://example.com/', phone: '3001234567', instagram: 'https://www.instagram.com/titanes_gym/' },
+  'Hotel Sicarare': { exists: true, website: 'https://otro-hotel.example.org', phone: '605 555 1234', instagram: '' },
+  'Negocio Fantasma': { exists: false },
+  'Servidor Interno': { exists: true, website: 'http://127.0.0.1:3199/sitio-interno' },
 };
 const mock = createServer((req, res) => {
   let raw = '';
@@ -91,6 +100,11 @@ const mock = createServer((req, res) => {
     seen.push({ url: req.url, key, body, prompt });
     if (mode === 'slow') await new Promise((r) => setTimeout(r, 1500));
     if (mode === 'error') return res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { message: 'API key not valid' } }));
+    if (prompt.includes('Eres un verificador de datos')) {
+      const names = [...prompt.matchAll(/^(\d+)\. (.+?) — /gm)];
+      const results = names.map(([, n, name]) => ({ n: Number(n), ...(SECOND[name] ?? { exists: false }) }));
+      return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ results }) }] } }] }));
+    }
     const kind = prompt.includes('guiones listos para grabar') ? 'guiones' : prompt.includes('prospección comercial') ? 'clientes' : prompt.includes('consultor de marketing digital y redes sociales') ? 'redes' : 'competencia';
     const text = mode === 'garbage' ? 'Lo siento, no puedo ayudarte con eso.' : 'Aquí está:\n```json\n' + JSON.stringify(ANSWERS[kind]) + '\n```';
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
@@ -189,9 +203,21 @@ check('Crea guiones (descarta los que no tienen gancho)', s1.status === 200 && s
 check('Los guiones parten de las oportunidades frente a la competencia', seen.at(-1).prompt.includes('Instalación incluida'));
 const l1 = await run('adm', 'clientes', 'gimnasios en Valledupar');
 const leads = l1.json?.report?.leads ?? [];
-check('Busca clientes potenciales', l1.status === 200 && leads.length === 2, l1.text.slice(0, 200));
-check('Prospectos: solo empresas, nunca personas particulares (regla en la instrucción)', seen.at(-1).prompt.includes('nunca personas particulares'));
-check('Quita la web javascript: del prospecto', leads[0]?.website === undefined, leads[0]?.website);
+const firstPass = seen.find((x) => x.prompt.includes('prospección comercial') && x.prompt.includes('gimnasios en Valledupar'));
+const secondPass = seen.filter((x) => x.prompt.includes('Eres un verificador de datos'));
+check('Busca clientes potenciales y los revisa con una segunda búsqueda', l1.status === 200 && secondPass.length >= 1, l1.text.slice(0, 200));
+check('Prospectos: solo empresas, nunca personas particulares (regla en la instrucción)', firstPass?.prompt.includes('nunca personas particulares'));
+check('La segunda búsqueda es independiente: solo recibe nombre, tipo y ciudad (no los datos de la primera)', secondPass[0]?.prompt.includes('Gimnasio Titanes — Gimnasio — Valledupar') && !secondPass[0].prompt.includes('titanes_gym') && !secondPass[0].prompt.includes('hotel.example.com'));
+check('La segunda búsqueda usa Google', !!secondPass[0]?.body.tools);
+check('Negocio que la segunda búsqueda no encuentra: descartado', leads.length === 3 && !leads.some((l) => l.name === 'Negocio Fantasma') && l1.json.report.discarded === 1, leads.map((l) => l.name));
+check('Todos los que quedan dicen "Verificado 2 veces"', leads.every((l) => l.verified === true));
+check('Teléfono igual en las dos búsquedas: confirmado ✓', leads[0]?.checks?.phone === 'ok' && leads[0].phone === '+57 300 123 4567', leads[0]?.checks);
+check('Instagram igual en las dos búsquedas: confirmado ✓', leads[0]?.checks?.instagram === 'ok');
+check('Dato que solo encontró una búsqueda: queda "sin confirmar" ⚠', leads[1]?.checks?.phone === 'once' && leads[1].phone === '605 555 1234', leads[1]);
+check('Si las dos búsquedas se contradicen (dos webs distintas), el dato se quita', leads[1]?.website === undefined && !leads[1]?.checks?.website, leads[1]);
+check('El servidor abre la web para confirmar que existe', leads[0]?.website === 'https://example.com/' && leads[0].webOnline === true && leads[0].checks?.website === 'once', leads[0]);
+check('Nunca abre direcciones internas del servidor (127.0.0.1): web quitada sin visitarla', leads[2]?.website === undefined && leads[2].webOnline === false && !seen.some((x) => x.url.includes('sitio-interno')), leads[2]);
+check('Quita la web javascript: del prospecto (la que queda viene de la segunda búsqueda)', !String(leads[0]?.website).startsWith('javascript'), leads[0]?.website);
 check('Convierte @usuario de Instagram en enlace y descarta lo que no es enlace', leads[0]?.instagram === 'https://www.instagram.com/titanes_gym' && leads[1]?.instagram === undefined, `${leads[0]?.instagram} | ${leads[1]?.instagram}`);
 check('Limpia el teléfono (sin etiquetas HTML)', leads[0]?.phone === '+57 300 123 4567', leads[0]?.phone);
 check('Puntaje entre 1 y 5', leads[0]?.fit === 5 && leads[1]?.fit === 3, `${leads[0]?.fit} ${leads[1]?.fit}`);

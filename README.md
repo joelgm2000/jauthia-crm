@@ -82,12 +82,18 @@ contacto, **qué contrató** (CRM, Chatbot o ambos), plan, mensualidad, día de 
   - **Guiones:** ideas de Reels, TikTok, historias y carruseles con gancho, escenas y llamado a WhatsApp.
   - **Clientes potenciales:** negocios reales (solo datos públicos de empresas, nunca personas) con web, teléfono,
     Instagram, por qué podrían comprar, un mensaje de primer contacto, botón de WhatsApp y exportar a Excel.
+    **Se revisan dos veces:** una segunda búsqueda independiente (solo con nombre, tipo y ciudad) debe encontrar cada
+    negocio o se descarta; cada dato que encuentran las dos queda con ✓, el que encuentra una sola dice "sin confirmar"
+    y si se contradicen se quita. El servidor además abre la web para comprobar que exista (nunca direcciones internas).
   - **Estadísticas reales:** datos medidos (no de la IA) de las cuentas que se escriban en el perfil, del negocio y
     de cada competidor: seguidores y su crecimiento, últimas publicaciones con visitas, me gusta, comentarios y
     compartidos, ranking de las que mejor funcionaron e interacción. Instagram y Facebook por la **API oficial de Meta**
     (token en *Editar cliente* o `META_SOCIAL_TOKEN`; las publicaciones de páginas de Facebook ajenas requieren que Meta
-    apruebe "Page Public Content Access"), YouTube por la **YouTube Data API** (gratis) y TikTok por **captura manual**.
-    Se actualizan con un botón (8 veces al día) y solas cada semana. La IA solo interpreta esos números.
+    apruebe "Page Public Content Access") y YouTube por la **YouTube Data API** (gratis). TikTok no ofrece una forma
+    gratuita de ver cuentas ajenas: la cuenta se guarda para el análisis. **Nadie escribe cifras a mano.**
+    *Buscar cuentas con IA* encuentra las cuentas de cada empresa con 3 búsquedas distintas en Gemini: solo guarda la
+    que sale en las 3 (las de 2 de 3 piden visto bueno). Se actualizan con un botón (8 veces al día) y solas cada semana.
+    La IA solo interpreta los números medidos.
     Las cifras que da la IA en los otros análisis ya no se muestran: solo las medidas.
   Cada análisis tiene filtros, gráficos y **Descargar PDF** (con el logo de JAUTHIA y el nombre del cliente).
   Usa la misma clave de Gemini del cliente. Tope de 20 análisis por día por cliente (`MARKET_DAILY_LIMIT`) y uno a la vez.

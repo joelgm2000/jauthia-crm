@@ -1,26 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import {
-  API_NETWORKS, avg, engagementRate, followersDelta, interactions, NETWORK_LABEL, postsPerWeek, SocialAccount, SocialPost, SocialStatsData,
-} from '@shared/social';
+import { DiscoverResult, FoundAccount } from '@shared/social';
+import { avg, engagementRate, followersDelta, interactions, NETWORK_LABEL, postsPerWeek, SocialAccount, SocialPost, SocialStatsData } from '@shared/social';
 import { CrmStore } from '../../core/data/crm-store';
 import { api } from '../../core/http';
 import { Icon } from '../../ui/icon';
 
-interface ManualRow { url: string; date: string; kind: string; caption: string; views: string; likes: string; comments: string; shares: string }
 interface Ranked { post: SocialPost; account: SocialAccount }
 
-const KINDS = ['Video', 'Reel', 'Short', 'Foto', 'Carrusel', 'Publicación'];
 const compact = new Intl.NumberFormat('es-CO', { notation: 'compact', maximumFractionDigits: 1 });
 const full = new Intl.NumberFormat('es-CO');
 
 /**
- * Estadísticas REALES de redes del cliente y su competencia (APIs oficiales o captura manual).
- * Cada cifra muestra su fuente y su fecha. Nada aquí lo inventa la IA.
+ * Estadísticas REALES de redes del cliente y su competencia, leídas con las APIs oficiales.
+ * Cada cifra muestra su fuente y su fecha. Nadie escribe cifras a mano.
  */
 @Component({
   selector: 'app-market-stats',
-  imports: [FormsModule, Icon],
+  imports: [Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './market-stats.html',
   styleUrl: './market-stats.css',
@@ -32,16 +28,15 @@ export class MarketStats implements OnInit {
   readonly pdf = output<void>();
   /** Avisa cuando hay datos (el padre habilita "Analizar con IA"). */
   readonly ready = output<boolean>();
+  /** La búsqueda de cuentas cambió el perfil del negocio (el padre lo vuelve a cargar). */
+  readonly profileChanged = output<void>();
 
   readonly label = NETWORK_LABEL;
-  readonly kinds = KINDS;
   readonly data = signal<SocialStatsData | null>(null);
   readonly loading = signal(true);
   readonly refreshing = signal(false);
-  readonly editing = signal<SocialAccount | null>(null);
-  readonly saving = signal(false);
-  manualFollowers = '';
-  manualRows: ManualRow[] = [];
+  readonly discovering = signal(false);
+  readonly found = signal<DiscoverResult | null>(null);
 
   ngOnInit(): void {
     void this.load();
@@ -68,12 +63,47 @@ export class MarketStats implements OnInit {
     try {
       const r = await api<{ ok: number; failed: number; data: SocialStatsData }>('/api/market/social/refresh', { method: 'POST', body: {} });
       this.set(r.data);
-      this.store.toast(r.failed ? `Se leyeron ${r.ok} cuentas; ${r.failed} con problemas (mira el detalle en cada una)` : `Se leyeron ${r.ok} cuentas con datos reales`, r.failed ? 'info' : 'success');
+      this.store.toast(r.failed ? `API oficial: ${r.ok} cuentas leídas, ${r.failed} con problemas (mira el detalle en cada una)` : `API oficial: ${r.ok} cuentas leídas`, r.failed ? 'info' : 'success');
     } catch (e) {
       this.store.toast((e as Error).message, 'error');
     } finally {
       this.refreshing.set(false);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Buscar cuentas con la IA (3 búsquedas por empresa)
+  // ---------------------------------------------------------------------------
+
+  async discover(): Promise<void> {
+    if (this.discovering()) return;
+    this.discovering.set(true);
+    try {
+      const r = await api<DiscoverResult>('/api/market/social/discover', { method: 'POST', body: {} });
+      this.found.set(r);
+      if (r.confirmed.length) this.profileChanged.emit();
+      await this.load();
+      this.store.toast(`Se revisaron ${r.searched} empresas: ${r.confirmed.length} cuentas confirmadas y ${r.doubtful.length} por confirmar`, 'success');
+    } catch (e) {
+      this.store.toast((e as Error).message, 'error');
+    } finally {
+      this.discovering.set(false);
+    }
+  }
+
+  async accept(f: FoundAccount): Promise<void> {
+    try {
+      await api('/api/market/social/accept', { method: 'POST', body: { owner: f.owner, network: f.network, handle: f.handle } });
+      this.found.update((r) => (r ? { ...r, doubtful: r.doubtful.filter((x) => x !== f), confirmed: [...r.confirmed, f] } : r));
+      this.profileChanged.emit();
+      await this.load();
+    } catch (e) {
+      this.store.toast((e as Error).message, 'error');
+    }
+  }
+
+  dismiss(f: FoundAccount): void {
+    this.found.update((r) => (r ? { ...r, doubtful: r.doubtful.filter((x) => x !== f) } : r));
   }
 
   // ---------------------------------------------------------------------------
@@ -104,7 +134,6 @@ export class MarketStats implements OnInit {
     (this.data()?.accounts ?? []).map((a) => ({ a, er: engagementRate(a) })).filter((x): x is { a: SocialAccount; er: number } => x.er !== undefined).sort((x, y) => y.er - x.er),
   );
   readonly maxEngagement = computed(() => Math.max(0.01, ...this.withEngagement().map((x) => x.er)));
-
   stats(a: SocialAccount) {
     return {
       ppw: postsPerWeek(a.posts),
@@ -134,13 +163,8 @@ export class MarketStats implements OnInit {
   }
 
   /** "@usuario" (los canales de YouTube ya traen la @; los ids UC… se muestran tal cual). */
-  at(a: SocialAccount): string {
+  at(a: Pick<SocialAccount, 'handle'>): string {
     return a.handle.startsWith('@') || a.handle.startsWith('UC') ? a.handle : '@' + a.handle;
-  }
-
-  canApi(a: SocialAccount): boolean {
-    const c = this.data()?.connections;
-    return API_NETWORKS.includes(a.network) && !!(a.network === 'youtube' ? c?.youtube : c?.meta);
   }
 
   n(v: number | undefined, compactForm = true): string {
@@ -150,49 +174,5 @@ export class MarketStats implements OnInit {
   when(ts: number | undefined, withTime = false): string {
     if (!ts) return '';
     return new Date(ts).toLocaleString('es-CO', { day: 'numeric', month: 'short', year: withTime ? undefined : 'numeric', ...(withTime ? { hour: 'numeric', minute: '2-digit' } : {}) });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Captura manual
-  // ---------------------------------------------------------------------------
-
-  openManual(a: SocialAccount): void {
-    this.manualFollowers = a.followers !== undefined ? String(a.followers) : '';
-    const s = (v?: number) => (v === undefined ? '' : String(v));
-    this.manualRows = a.source === 'manual' || !a.posts.length
-      ? a.posts.map((p) => ({ url: p.url ?? '', date: new Date(p.date).toISOString().slice(0, 10), kind: p.kind, caption: p.caption, views: s(p.views), likes: s(p.likes), comments: s(p.comments), shares: s(p.shares) }))
-      : [];
-    if (!this.manualRows.length) this.addRow();
-    this.editing.set(a);
-  }
-
-  addRow(): void {
-    this.manualRows.push({ url: '', date: new Date().toISOString().slice(0, 10), kind: 'Video', caption: '', views: '', likes: '', comments: '', shares: '' });
-  }
-
-  async saveManual(): Promise<void> {
-    const a = this.editing();
-    if (!a) return;
-    const int = (v: string) => {
-      const d = v.replace(/[^\d]/g, '');
-      return d ? Number(d) : undefined;
-    };
-    const posts = this.manualRows
-      .filter((r) => r.url.trim() || r.caption.trim() || r.views || r.likes)
-      .map((r) => ({
-        url: r.url.trim() || undefined, date: new Date(r.date + 'T12:00:00').getTime() || Date.now(), kind: r.kind, caption: r.caption.trim().slice(0, 300),
-        views: int(r.views), likes: int(r.likes), comments: int(r.comments), shares: int(r.shares),
-      }));
-    this.saving.set(true);
-    try {
-      await api('/api/market/social/manual', { method: 'PUT', body: { network: a.network, handle: a.handle, followers: int(this.manualFollowers), posts } });
-      this.editing.set(null);
-      this.store.toast('Datos guardados', 'success');
-      await this.load();
-    } catch (e) {
-      this.store.toast((e as Error).message, 'error');
-    } finally {
-      this.saving.set(false);
-    }
   }
 }

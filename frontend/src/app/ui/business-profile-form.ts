@@ -29,7 +29,7 @@ import { Icon } from './icon';
       <div class="field"><label>YouTube</label><input class="input" maxlength="300" [(ngModel)]="p.youtube" (ngModelChange)="changed.emit()" placeholder="@canal o https://youtube.com/@…" /></div>
     </div>
     <div class="field">
-      <label>Competidores <small class="muted">Para el análisis con IA son opcionales (los busca sola). Para las <b>estadísticas reales</b> escribe aquí sus cuentas exactas: solo se miden las que confirmes.</small></label>
+      <label>Competidores <small class="muted">Opcionales: la IA los busca sola, y en <b>Estadísticas reales → Buscar cuentas con IA</b> encuentra sus cuentas (solo guarda las que salen en 3 búsquedas distintas). También puedes escribirlas aquí.</small></label>
       @for (c of p.competitors; track $index) {
         <div class="comp">
           <div class="comp-top">
