@@ -1,6 +1,7 @@
 /** Llamadas HTTP a las redes (Meta y Telegram): siempre con tiempo límite y sin filtrar tokens en los registros. */
 
-export const GRAPH_URL = 'https://graph.facebook.com/v21.0';
+/** API de Meta (versión actual; META_GRAPH_URL solo se cambia para pruebas con un servidor falso). */
+export const GRAPH_URL = (process.env.META_GRAPH_URL || 'https://graph.facebook.com/v23.0').replace(/\/$/, '');
 
 export function telegramUrl(token: string, method: string): string {
   return `https://api.telegram.org/bot${token}/${method}`;

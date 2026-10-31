@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { CHANNEL_LABELS, ChannelConfig, ChannelType } from '@shared/models';
 import { AuthService } from '../../core/auth.service';
+import { api } from '../../core/http';
 import { CrmStore } from '../../core/data/crm-store';
 import { ChannelIcon } from '../../ui/channel-icon';
 import { Icon } from '../../ui/icon';
@@ -94,6 +95,20 @@ const INFO: ChannelInfo[] = [
   { id: 'email', available: false, desc: 'Correo entrante (próximamente).', fields: [], secrets: [], steps: [], interactive: 'Texto' },
 ];
 
+/** Lo que la plataforma tiene listo para conectar WhatsApp con un clic. */
+interface WaSetup { ready: boolean; appId?: string; configId?: string; graphVersion: string }
+interface WaConnectResult { coexistence: boolean; sync?: { contacts: boolean; history: boolean }; channel: ChannelConfig }
+type WaTab = 'meta' | 'test' | 'manual';
+
+/** SDK oficial de Meta (se carga solo cuando alguien toca "Conectar con Meta"). */
+interface FbSdk {
+  init(o: object): void;
+  login(cb: (r: { authResponse?: { code?: string } }) => void, o: object): void;
+}
+declare global {
+  interface Window { FB?: FbSdk; fbAsyncInit?: () => void }
+}
+
 @Component({
   selector: 'app-channels',
   imports: [FormsModule, Icon, ChannelIcon],
@@ -114,6 +129,13 @@ export class Channels {
   pub: Record<string, Record<string, string>> = {};
   private byId = computed(() => new Map(this.store.channels().map((c) => [c.id, c])));
 
+  // ---- Asistente de WhatsApp ----
+  readonly waTab = signal<WaTab>('meta');
+  readonly waSetup = signal<WaSetup | null>(null);
+  readonly waBusy = signal<string | null>(null);
+  readonly waDone = signal<WaConnectResult | null>(null);
+  testTo = '';
+
   config(id: ChannelType): ChannelConfig {
     return this.byId().get(id) ?? { id, enabled: false, connected: false, botEnabled: true };
   }
@@ -121,6 +143,7 @@ export class Channels {
   toggleOpen(i: ChannelInfo): void {
     const id = this.open() === i.id ? null : i.id;
     this.open.set(id);
+    if (id === 'whatsapp') void this.loadWaSetup();
     if (id) {
       this.draft[i.id] = {};
       const c = this.config(i.id) as unknown as Record<string, string>;
@@ -161,8 +184,111 @@ export class Channels {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // WhatsApp: conectar con un clic (Meta), número de prueba o manual
+  // ---------------------------------------------------------------------------
+
+  async loadWaSetup(): Promise<void> {
+    try {
+      const s = await api<WaSetup>('/api/channels/whatsapp/setup');
+      this.waSetup.set(s);
+      const c = this.config('whatsapp');
+      this.waTab.set(c.connectionMode === 'test' ? 'test' : c.connectionMode === 'manual' || (!s.ready && c.phoneNumberId) ? 'manual' : 'meta');
+    } catch (e) {
+      this.store.toast((e as Error).message, 'error');
+    }
+  }
+
+  private loadFbSdk(s: WaSetup): Promise<FbSdk> {
+    if (window.FB) return Promise.resolve(window.FB);
+    return new Promise((ok, fail) => {
+      window.fbAsyncInit = () => {
+        window.FB!.init({ appId: s.appId, autoLogAppEvents: true, xfbml: false, version: s.graphVersion });
+        ok(window.FB!);
+      };
+      const el = document.createElement('script');
+      el.src = 'https://connect.facebook.net/es_LA/sdk.js';
+      el.async = true;
+      el.crossOrigin = 'anonymous';
+      el.onerror = () => fail(new Error('No se pudo abrir la ventana de Meta. Revisa tu conexión o desactiva el bloqueador de anuncios.'));
+      document.body.appendChild(el);
+    });
+  }
+
+  /** Abre la ventana oficial de Meta. El cliente elige su número (o su app de WhatsApp Business) y el CRM hace el resto. */
+  async connectMeta(): Promise<void> {
+    const s = this.waSetup();
+    if (!s?.ready || this.waBusy()) return;
+    this.waBusy.set('Abriendo la ventana de Meta…');
+    this.waDone.set(null);
+    // Meta avisa por mensaje qué cuenta y qué número eligió el cliente.
+    const session: { wabaId?: string; phoneNumberId?: string; appOnboarding?: boolean; cancelled?: string } = {};
+    const onMsg = (e: MessageEvent) => {
+      if (!/^https:\/\/(www|web)\.facebook\.com$/.test(e.origin)) return;
+      try {
+        const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (d?.type !== 'WA_EMBEDDED_SIGNUP') return;
+        if (d.event === 'CANCEL') session.cancelled = d.data?.current_step ?? 'cancelado';
+        if (d.data?.waba_id) session.wabaId = String(d.data.waba_id);
+        if (d.data?.phone_number_id) session.phoneNumberId = String(d.data.phone_number_id);
+        if (d.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') session.appOnboarding = true;
+      } catch {
+        /* otros mensajes de Meta */
+      }
+    };
+    window.addEventListener('message', onMsg);
+    try {
+      const FB = await this.loadFbSdk(s);
+      this.waBusy.set('Sigue los pasos en la ventana de Meta…');
+      const code = await new Promise<string | undefined>((ok) =>
+        FB.login((r) => ok(r.authResponse?.code), {
+          config_id: s.configId, response_type: 'code', override_default_response_type: true,
+          extras: { setup: {}, sessionInfoVersion: '3' },
+        }),
+      );
+      await new Promise((r) => setTimeout(r, 800)); // el último aviso de Meta puede llegar justo después
+      if (!code || !session.wabaId) {
+        this.store.toast(session.cancelled ? 'Cerraste la ventana de Meta antes de terminar. Puedes intentarlo de nuevo.' : 'Meta no terminó la conexión. Intenta de nuevo.', 'info');
+        return;
+      }
+      this.waBusy.set('Conectando el número y trayendo tus chats…');
+      const r = await api<WaConnectResult>('/api/channels/whatsapp/connect', { method: 'POST', body: { code, ...session, cancelled: undefined } });
+      this.waDone.set(r);
+      this.store.toast('¡WhatsApp conectado!', 'success');
+    } catch (e) {
+      this.store.toast((e as Error).message, 'error');
+    } finally {
+      window.removeEventListener('message', onMsg);
+      this.waBusy.set(null);
+    }
+  }
+
+  /** Modo prueba: guarda el número de prueba de Meta (Phone Number ID + token temporal). */
+  async saveTest(i: ChannelInfo): Promise<void> {
+    await this.store.saveChannel({ ...this.config('whatsapp'), connectionMode: 'test' });
+    await this.save(i);
+  }
+
+  async sendTest(): Promise<void> {
+    if (this.waBusy()) return;
+    this.waBusy.set('Enviando el mensaje de prueba…');
+    try {
+      await api('/api/channels/whatsapp/test', { method: 'POST', body: { to: this.testTo } });
+      this.store.toast('Mensaje enviado: revisa ese WhatsApp ("Hello World" de Meta)', 'success');
+    } catch (e) {
+      this.store.toast((e as Error).message, 'error');
+    } finally {
+      this.waBusy.set(null);
+    }
+  }
+
   webhookUrl(hook: string): string {
     return `${this.store.publicBaseUrl() || window.location.origin}/webhooks/${this.auth.tenant()?.id}/${hook}`;
+  }
+
+  /** Webhook único de la plataforma (números conectados con Meta o de prueba en la app de JAUTHIA). */
+  platformWebhook(): string {
+    return `${this.store.publicBaseUrl() || window.location.origin}/webhooks/whatsapp`;
   }
 
   widgetSnippet(): string {

@@ -9,6 +9,7 @@ sh restart.sh                 # base vacía + backend de QA
 node security.mjs final       # 59 pruebas de seguridad      → results/security-final.json
 sh restart.sh && node media.mjs   # fotos, videos e IA de imágenes → results/media.json
 SOCIAL_GRAPH_URL=http://localhost:3198/graph YOUTUBE_API_URL=http://localhost:3198/yt AI_BASE_URL=http://localhost:3198 sh restart.sh && node social.mjs   # estadísticas reales y búsqueda triple con APIs falsas → results/social.json
+META_APP_ID=1234567890 META_APP_SECRET=qa_app_secret_123 META_ES_CONFIG_ID=987654321 META_WEBHOOK_VERIFY_TOKEN=qa_verify_token_123 META_GRAPH_URL=http://localhost:3197/graph sh restart.sh && node whatsapp.mjs   # asistente de WhatsApp y coexistencia con un Meta falso
 AI_BASE_URL=http://localhost:3199 sh restart.sh && node market.mjs   # inteligencia de mercado con un Gemini falso → results/market.json
 sh restart.sh
 node conversations.mjs        # 12 conversaciones del bot      → results/conversations.json

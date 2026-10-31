@@ -60,6 +60,11 @@ contacto, **qué contrató** (CRM, Chatbot o ambos), plan, mensualidad, día de 
 - **Canales:** el cliente (o tú) pega su Phone Number ID, su token de WhatsApp, la clave secreta de la app y el token de
   verificación. Los tokens se guardan **cifrados (AES-256-GCM)** y nunca se vuelven a mostrar, solo `••••1234`.
   El botón **Probar conexión** valida los datos contra Meta o Telegram; en Telegram registra el webhook solo.
+  **WhatsApp en un clic:** en *Canales → WhatsApp* hay un asistente con 3 caminos: *Conectar mi número* (ventana
+  oficial de Meta, Embedded Signup; incluye **coexistencia**: el negocio sigue usando la app de WhatsApp Business del
+  celular, se traen contactos y chats de 6 meses, y lo que responda desde el celular aparece en la bandeja y pausa el
+  bot), *Probar primero* (número de prueba gratis de Meta y botón "Enviar prueba") y *Manual*. Los números conectados
+  con Meta usan un solo webhook de la plataforma (`/webhooks/whatsapp`). Configuración única: `deploy/whatsapp-meta.md`.
 - **Catálogo:** cada cliente crea **sus categorías y tipos de producto**. Los filtros de gimnasio (peso máximo,
   caminar/trotar, techo) solo aparecen si los activa.
   **Carga rápida:** pega el producto como lo escribirías en WhatsApp (nombre, precio y una característica por línea)

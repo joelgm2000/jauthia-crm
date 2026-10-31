@@ -29,6 +29,70 @@
 
           @if (open() === i.id) {
             <div class="setup">
+              @if (i.id === 'whatsapp') {
+                @if (c.coexistence && c.connected) { <p class="coex"><app-icon name="phone" [size]="14" /> <span><b>Coexistencia activa:</b> el número sigue funcionando en la app de WhatsApp Business del celular y también en el CRM.</span></p> }
+                @if (c.metaNotice; as n) { <div class="result"><app-icon name="info" [size]="15" /> {{ n.text }}</div> }
+                <div class="tabs wa-tabs">
+                  <button [class.on]="waTab() === 'meta'" (click)="waTab.set('meta')">1 · Conectar mi número</button>
+                  <button [class.on]="waTab() === 'test'" (click)="waTab.set('test')">Probar primero</button>
+                  <button [class.on]="waTab() === 'manual'" (click)="waTab.set('manual')">Manual</button>
+                </div>
+              }
+
+              @if (i.id === 'whatsapp' && waTab() === 'meta') {
+                <div class="wa-meta">
+                  <p>Conecta el número de tu empresa en <b>3 pasos</b>, sin copiar códigos:</p>
+                  <ol class="big">
+                    <li>Toca <b>Conectar con Meta</b> e inicia sesión con tu Facebook (el que administra tu empresa).</li>
+                    <li>Si ya usas <b>WhatsApp Business en tu celular</b>, elige <b>"Conectar mi app de WhatsApp Business"</b> y escanea el código QR con el celular. Seguirás usando la app y además tendrás el CRM y el bot (coexistencia).</li>
+                    <li>Listo: el CRM conecta el número{{ ' ' }}y trae tus contactos y chats de los últimos 6 meses.</li>
+                  </ol>
+                  @if (waSetup(); as s) {
+                    @if (s.ready) {
+                      <button class="btn primary big-btn" [disabled]="!!waBusy()" (click)="connectMeta()"><app-icon name="plug" [size]="16" /> {{ waBusy() || 'Conectar con Meta' }}</button>
+                    } @else {
+                      <div class="result"><app-icon name="info" [size]="15" /> La conexión con un clic aún no está activa en la plataforma (falta configurar la app de Meta de JAUTHIA). Mientras tanto puedes <a href="" (click)="$event.preventDefault(); waTab.set('test')">probar con el número de prueba</a> o usar la configuración manual.</div>
+                    }
+                  } @else { <p class="muted">Cargando…</p> }
+                  @if (waDone(); as r) {
+                    <div class="result ok"><app-icon name="check" [size]="15" />
+                      <div>
+                        <b>Conectado: {{ r.channel.accountName }}</b>
+                        @if (r.coexistence) {
+                          <br />Sigues usando la app del celular. {{ r.sync?.history ? 'Tus chats de los últimos 6 meses y tus contactos están llegando a la bandeja (puede tardar unos minutos; deja la app abierta).' : 'No se pudieron pedir los chats anteriores: Meta solo lo permite en las primeras 24 horas.' }}
+                        } @else { <br />El número quedó listo para el bot y la bandeja. }
+                      </div>
+                    </div>
+                  }
+                  <small class="muted">En la app del celular no funcionan desde la API los grupos, las listas de difusión ni las llamadas. Abre la app al menos una vez cada 14 días para que el número siga conectado.</small>
+                </div>
+              }
+
+              @if (i.id === 'whatsapp' && waTab() === 'test') {
+                <div class="wa-test">
+                  <p>Prueba el bot <b>gratis</b> con el número de prueba que Meta le da a cada app, antes de conectar el número real.</p>
+                  <ol class="big">
+                    <li>Entra a <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer">developers.facebook.com/apps</a> → tu app → <b>WhatsApp</b> → <b>Configuración de la API</b>.</li>
+                    <li>En <b>"Para"</b>, agrega tu celular y confírmalo con el código que te llega (Meta permite hasta 5 números de prueba).</li>
+                    <li>Copia el <b>Identificador del número de teléfono</b> y el <b>Token de acceso temporal</b> y pégalos aquí.</li>
+                  </ol>
+                  <div class="field"><label>Identificador del número de teléfono (Phone Number ID)</label>
+                    <input class="input mono" placeholder="1234567890" [(ngModel)]="pub[i.id]['phoneNumberId']" /></div>
+                  <div class="field">
+                    <label><app-icon name="tag" [size]="12" /> Token de acceso temporal @if (saved(i.id, 'accessToken'); as m) { <span class="badge ok">guardado {{ m }}</span> }</label>
+                    <input class="input mono" type="password" autocomplete="off" [placeholder]="saved(i.id, 'accessToken') ? 'Escribe solo si quieres cambiarlo' : 'Pega aquí'" [(ngModel)]="draft[i.id]['accessToken']" />
+                    <small class="muted">Este token vence en 24 horas: sirve solo para probar.</small>
+                  </div>
+                  <div class="row"><button class="btn primary" (click)="saveTest(i)"><app-icon name="check" [size]="14" /> Guardar número de prueba</button></div>
+                  <div class="field"><label>Enviarme un mensaje de prueba a</label>
+                    <div class="row"><input class="input mono" placeholder="57 300 123 4567" [(ngModel)]="testTo" />
+                      <button class="btn" [disabled]="!!waBusy() || !testTo.trim()" (click)="sendTest()"><app-icon name="send" [size]="14" /> {{ waBusy() ? 'Enviando…' : 'Enviar prueba' }}</button></div>
+                    <small class="muted">Llega la plantilla "Hello World" de Meta. Después, respóndele a ese número y verás al bot contestar (el webhook de la app debe apuntar a {{ platformWebhook() }}).</small>
+                  </div>
+                </div>
+              }
+
+              @if (i.id !== 'whatsapp' || waTab() === 'manual') {
               <ol>@for (s of i.steps; track $index) { <li>{{ s }}</li> }</ol>
 
               @for (f of i.fields; track f.key) {
@@ -66,6 +130,7 @@
                 @if (i.fields.length || i.secrets.length) { <button class="btn primary" (click)="save(i)"><app-icon name="check" [size]="14" /> Guardar</button> }
                 <button class="btn" [disabled]="testing() === i.id" (click)="test(i)"><app-icon name="refresh" [size]="14" /> {{ testing() === i.id ? 'Probando…' : 'Probar conexión' }}</button>
               </div>
+              }
               <small class="muted secure"><app-icon name="info" [size]="12" /> Los tokens se guardan cifrados en el servidor. Nadie (ni siquiera tú desde esta pantalla) puede volver a verlos completos.</small>
             </div>
           }

@@ -62,12 +62,22 @@ export const config = {
   aiImageModel: process.env.AI_IMAGE_MODEL || 'gemini-2.5-flash-image',
   /** Modelo de Gemini que investiga en internet para la inteligencia de mercado (con búsqueda de Google). */
   aiTextModel: process.env.AI_TEXT_MODEL || 'gemini-2.5-flash',
+  /**
+   * App de Meta de la plataforma (JAUTHIA como Tech Provider) para conectar WhatsApp con un clic ("Embedded Signup"),
+   * incluida la coexistencia con la app de WhatsApp Business. Sin estos datos, el asistente ofrece el modo manual.
+   */
+  metaAppId: process.env.META_APP_ID ?? '',
+  metaAppSecret: process.env.META_APP_SECRET ?? '',
+  /** Configuración de "Facebook Login for Business" con Embedded Signup (versión 4 o superior). */
+  metaEsConfigId: process.env.META_ES_CONFIG_ID ?? '',
+  /** Token de verificación del webhook ÚNICO de la plataforma (/webhooks/whatsapp), el que se pega en la app de Meta. */
+  metaWebhookVerifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN ?? '',
   /** Token de Meta de la plataforma (Instagram y Facebook) para las estadísticas reales, si el cliente no tiene uno propio. */
   metaSocialToken: process.env.META_SOCIAL_TOKEN ?? '',
   /** Clave de YouTube Data API de la plataforma, si el cliente no tiene una propia. */
   youtubeApiKey: process.env.YOUTUBE_API_KEY ?? '',
   /** Direcciones de las APIs de redes (solo se cambian para pruebas con servidores falsos). */
-  socialGraphUrl: (process.env.SOCIAL_GRAPH_URL || 'https://graph.facebook.com/v21.0').replace(/\/$/, ''),
+  socialGraphUrl: (process.env.SOCIAL_GRAPH_URL || 'https://graph.facebook.com/v23.0').replace(/\/$/, ''),
   youtubeApiUrl: (process.env.YOUTUBE_API_URL || 'https://www.googleapis.com/youtube/v3').replace(/\/$/, ''),
   /** Análisis de inteligencia de mercado que puede pedir cada cliente por día. */
   marketDailyLimit: Math.max(1, Number(process.env.MARKET_DAILY_LIMIT ?? 20)),

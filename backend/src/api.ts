@@ -21,6 +21,7 @@ import { getSetting, listDocs, listMessages } from './db';
 import { log } from './log';
 import { marketRouter } from './market';
 import { mediaRouter } from './media';
+import { waConnectRouter } from './whatsapp-connect';
 import { actionSchemas, id } from './schemas';
 import { secretsStatus } from './secrets';
 
@@ -38,6 +39,7 @@ const userLimiter = rateLimit({
 apiRouter.use(requireCsrfHeader, requireAuth, requireTenant, userLimiter);
 apiRouter.use('/media', mediaRouter);
 apiRouter.use('/market', marketRouter);
+apiRouter.use('/channels/whatsapp', waConnectRouter);
 
 /** Todo lo que la interfaz necesita al cargar (solo datos del cliente activo). */
 apiRouter.get('/bootstrap', async (req, res) => {

@@ -97,6 +97,8 @@ const channel = z.object({
   id: channelType, enabled: z.boolean(), connected: z.boolean(), botEnabled: z.boolean(),
   accountName: short(120).optional(), phoneNumberId: digits.optional(), wabaId: digits.optional(),
   pageId: digits.optional(), igAccountId: digits.optional(), botUsername: short(60).optional(),
+  connectionMode: z.enum(['meta', 'test', 'manual']).optional(), coexistence: z.boolean().optional(),
+  syncRequestedAt: z.number().optional(), metaNotice: z.object({ at: z.number(), text: short(300) }).optional(),
 });
 
 const settings = z.object({

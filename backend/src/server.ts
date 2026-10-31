@@ -42,13 +42,15 @@ async function main(): Promise<void> {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
+          // connect.facebook.net: ventana oficial de Meta para conectar WhatsApp con un clic.
+          scriptSrc: ["'self'", "'unsafe-inline'", 'https://connect.facebook.net'],
+          frameSrc: ["'self'", 'https://www.facebook.com', 'https://web.facebook.com', 'https://connect.facebook.net'],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
           // blob: vista previa de las fotos y videos antes de subirlos.
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
           mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
-          connectSrc: ["'self'", 'ws:', 'wss:'],
+          connectSrc: ["'self'", 'ws:', 'wss:', 'https://www.facebook.com', 'https://graph.facebook.com', 'https://connect.facebook.net'],
           frameAncestors: ["'none'"],
         },
       },

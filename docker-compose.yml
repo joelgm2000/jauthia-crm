@@ -43,6 +43,11 @@ services:
       MARKET_DAILY_LIMIT: ${MARKET_DAILY_LIMIT:-20}
       # Estadísticas reales de redes (opcional: también se ponen por cliente en el panel).
       META_SOCIAL_TOKEN: ${META_SOCIAL_TOKEN:-}
+      # WhatsApp con un clic y coexistencia (ver deploy/whatsapp-meta.md).
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_ES_CONFIG_ID: ${META_ES_CONFIG_ID:-}
+      META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN:-}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
     volumes:
       - media:/app/media

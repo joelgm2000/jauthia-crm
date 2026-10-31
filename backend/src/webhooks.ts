@@ -1,13 +1,16 @@
 /**
  * Webhooks públicos de las redes, uno por cliente:
  *
- *  GET/POST /webhooks/:tenantId/whatsapp   WhatsApp Cloud API
+ *  GET/POST /webhooks/whatsapp             WhatsApp de la plataforma: números conectados con el asistente de Meta
+ *                                          (uno solo para todos; cada mensaje va al cliente dueño del número)
+ *  GET/POST /webhooks/:tenantId/whatsapp   WhatsApp Cloud API (configuración manual de cada cliente)
  *  GET/POST /webhooks/:tenantId/meta       Messenger e Instagram
  *  POST     /webhooks/:tenantId/telegram   Bot de Telegram
  *  POST     /webhooks/:tenantId/webchat    Widget del sitio web (+ GET .../webchat/:sessionId/messages)
  *
  * Seguridad: Meta se valida con la firma X-Hub-Signature-256 usando la clave secreta de la app DE ESE
- * cliente, y Telegram con su secret_token. Sin esos secretos, en producción se rechaza todo.
+ * cliente (o la de la plataforma en /webhooks/whatsapp), y Telegram con su secret_token. Sin esos secretos,
+ * en producción se rechaza todo.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextFunction, Request, Response, Router } from 'express';
@@ -22,6 +25,7 @@ import { fetchJson, GRAPH_URL, telegramUrl } from './http';
 import { getDoc, pool } from './db';
 import { log } from './log';
 import { getSecrets } from './secrets';
+import { accountNotice, HistoryThread, importHistory, ingestEcho, syncContacts, tenantByPhone } from './whatsapp-connect';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -100,11 +104,20 @@ interface WaMessage {
   [media: string]: unknown;
 }
 interface WaValue {
+  metadata?: { phone_number_id?: string };
   statuses?: { id: string; status: string }[];
   contacts?: { wa_id: string; profile?: { name?: string } }[];
   messages?: WaMessage[];
+  /** Coexistencia: mensajes que el negocio envió desde la app del celular. */
+  message_echoes?: { to?: string; id?: string; timestamp?: string; type?: string; text?: { body?: string } }[];
+  /** Coexistencia: historial de la app (hasta 6 meses). */
+  history?: { threads?: HistoryThread[] }[];
+  /** Coexistencia: contactos de la app. */
+  state_sync?: { contact?: { full_name?: string; phone_number?: string }; action?: string }[];
+  /** Avisos de la cuenta (desconexión, reconexión…). */
+  event?: string;
 }
-interface WaBody { entry?: { changes?: { value?: WaValue }[] }[] }
+interface WaBody { entry?: { id?: string; changes?: { field?: string; value?: WaValue }[] }[] }
 
 const MEDIA_TYPES = ['image', 'document', 'audio', 'video', 'sticker'];
 
@@ -129,14 +142,71 @@ webhooksRouter.post('/:tenantId/whatsapp', tenantParam, async (req, res) => {
   const t = req.hookTenant!.id;
   const body = (req.body ?? {}) as WaBody;
   for (const entry of body.entry ?? []) {
+    for (const change of entry.changes ?? []) await handleWaValue(t, change.value ?? {});
+  }
+});
+
+/** Estados y mensajes entrantes de WhatsApp de un cliente. */
+async function handleWaValue(t: string, v: WaValue): Promise<void> {
+  await each(v.statuses, 'whatsapp (estado)', t, (st) => updateStatus(t, st.id, (st.status === 'failed' ? 'failed' : st.status) as ChatMessage['status']));
+  const names = new Map((v.contacts ?? []).map((c) => [c.wa_id, c.profile?.name]));
+  await each(v.messages, 'whatsapp', t, async (m) => {
+    const { text, buttonId, isMedia } = readWaMessage(m);
+    await ingest(t, { channel: 'whatsapp', externalId: String(m.from), name: names.get(m.from), phone: '+' + m.from, channelMessageId: m.id, text: text.slice(0, 4000), buttonId, isMedia });
+  });
+}
+
+// --- Webhook único de la plataforma (números conectados con el asistente de Meta, con o sin coexistencia) ---
+
+webhooksRouter.get('/whatsapp', (req, res) => {
+  const token = config.metaWebhookVerifyToken;
+  const ok = !!token && req.query['hub.mode'] === 'subscribe' && safeEqual(String(req.query['hub.verify_token'] ?? ''), token);
+  if (ok) res.status(200).type('text/plain').send(String(req.query['hub.challenge'] ?? ''));
+  else res.sendStatus(403);
+});
+
+webhooksRouter.post('/whatsapp', async (req, res) => {
+  const secret = config.metaAppSecret;
+  const sig = req.get('x-hub-signature-256') ?? '';
+  const expected = secret ? 'sha256=' + createHmac('sha256', secret).update(req.rawBody ?? Buffer.alloc(0)).digest('hex') : '';
+  if (!secret || !safeEqual(sig, expected)) {
+    res.sendStatus(401);
+    return;
+  }
+  res.sendStatus(200);
+  const body = (req.body ?? {}) as WaBody;
+  for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
       const v = change.value ?? {};
-      await each(v.statuses, 'whatsapp (estado)', t, (st) => updateStatus(t, st.id, (st.status === 'failed' ? 'failed' : st.status) as ChatMessage['status']));
-      const names = new Map((v.contacts ?? []).map((c) => [c.wa_id, c.profile?.name]));
-      await each(v.messages, 'whatsapp', t, async (m) => {
-        const { text, buttonId, isMedia } = readWaMessage(m);
-        await ingest(t, { channel: 'whatsapp', externalId: String(m.from), name: names.get(m.from), phone: '+' + m.from, channelMessageId: m.id, text: text.slice(0, 4000), buttonId, isMedia });
-      });
+      try {
+        if (change.field === 'account_update') {
+          if (entry.id && v.event) await accountNotice(entry.id, v.event);
+          continue;
+        }
+        const phoneId = v.metadata?.phone_number_id;
+        const t = phoneId ? await tenantByPhone(phoneId) : null;
+        const tenant = t ? await getTenant(t) : null;
+        if (!t || !tenant || tenant.status === 'suspendido') {
+          log.warn('webhook whatsapp: número sin cliente', { phoneId });
+          continue;
+        }
+        if (change.field === 'smb_message_echoes') {
+          await each(v.message_echoes, 'whatsapp (eco)', t, async (e) => {
+            if (!e.to || !e.id) return;
+            const text = e.type === 'text' ? e.text?.body ?? '' : `[${e.type ?? 'mensaje'}]`;
+            await ingestEcho(t, { to: String(e.to).replace(/\D/g, ''), id: e.id, text: text.slice(0, 4000), at: (Number(e.timestamp) || Date.now() / 1000) * 1000 });
+          });
+        } else if (change.field === 'history') {
+          const n = await importHistory(t, (v.history ?? []).flatMap((x) => x.threads ?? []));
+          log.info('WhatsApp: historial importado', { tenant: t, mensajes: n });
+        } else if (change.field === 'smb_app_state_sync') {
+          await syncContacts(t, v.state_sync ?? []);
+        } else {
+          await handleWaValue(t, v);
+        }
+      } catch (e) {
+        log.error('webhook whatsapp (plataforma)', { field: change.field, error: (e as Error).message });
+      }
     }
   }
 });

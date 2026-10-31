@@ -286,6 +286,14 @@ export interface ChannelConfig {
   igAccountId?: string;
   botUsername?: string;
   botEnabled: boolean;
+  /** WhatsApp: cómo se conectó (asistente de Meta, número de prueba de Meta o datos pegados a mano). */
+  connectionMode?: 'meta' | 'test' | 'manual';
+  /** WhatsApp: el número sigue usándose en la app de WhatsApp Business del celular (coexistencia). */
+  coexistence?: boolean;
+  /** Coexistencia: cuándo se pidió traer contactos e historial (Meta solo lo permite una vez, en las primeras 24 h). */
+  syncRequestedAt?: number;
+  /** Último aviso de Meta sobre la cuenta (ej. desconectada por no abrir la app en 14 días). */
+  metaNotice?: { at: number; text: string };
 }
 
 export interface Advisor {

@@ -79,6 +79,11 @@ export async function setAiKey(tenantId: string, key: string): Promise<void> {
   await writeSecrets(tenantId, 'ai', ['geminiApiKey'], { geminiApiKey: key });
 }
 
+/** PIN de verificación en dos pasos del número de WhatsApp registrado por el asistente (nunca se muestra). */
+export async function setWhatsAppPin(tenantId: string, pin: string): Promise<void> {
+  await writeSecrets(tenantId, 'whatsapp', ['pin'], { pin });
+}
+
 /** Claves para leer estadísticas reales de redes (Meta: Instagram y Facebook; YouTube). Nunca salen hacia el navegador. */
 export interface SocialKeys {
   metaToken?: string;
@@ -103,7 +108,8 @@ export async function secretsStatus(tenantId: string): Promise<Record<string, Re
   const out: Record<string, Record<string, string>> = {};
   for (const channel of Object.keys(SECRET_FIELDS) as ChannelType[]) {
     const s = await getSecrets(tenantId, channel);
-    out[channel] = Object.fromEntries(Object.entries(s).map(([k, v]) => [k, '••••' + v.slice(-4)]));
+    // El PIN de WhatsApp no se muestra ni siquiera en parte.
+    out[channel] = Object.fromEntries(Object.entries(s).filter(([k]) => k !== 'pin').map(([k, v]) => [k, '••••' + v.slice(-4)]));
   }
   return out;
 }
