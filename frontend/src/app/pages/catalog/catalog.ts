@@ -47,7 +47,8 @@ import { QuickAdd } from './quick-add';
             <div class="pb">
               <small class="cap">{{ catName(p.category) }} · {{ p.subcategory }}{{ gym() && p.line ? ' · ' + p.line : '' }}</small>
               <b>{{ p.name }}</b>
-              <span class="price">{{ p.price | cop }}</span>
+              <span class="price">{{ p.variants?.length ? 'Desde ' : '' }}{{ p.price | cop }}</span>
+              @if (p.variants?.length) { <small class="muted">{{ p.variants!.length }} precios</small> }
               <div class="row wrap kw">@for (k of p.keywords.slice(0, 4); track k) { <span class="chip">{{ k }}</span> }</div>
             </div>
           </article>
@@ -63,7 +64,11 @@ import { QuickAdd } from './quick-add';
             <div class="modal-body">
               <div class="grid-2">
                 <div class="field"><label>Nombre</label><input class="input" [(ngModel)]="p.name" /></div>
-                <div class="field"><label>Precio ({{ currency() }})</label><input class="input" type="number" [(ngModel)]="p.price" /></div>
+                @if (p.variants?.length) {
+                  <div class="field"><label>Precio ({{ currency() }})</label><input class="input" disabled [value]="'Desde ' + (lowest(p) | cop)" /></div>
+                } @else {
+                  <div class="field"><label>Precio ({{ currency() }})</label><input class="input" type="number" [(ngModel)]="p.price" /></div>
+                }
               </div>
               <div class="grid-3">
                 <div class="field"><label>Categoría</label>
@@ -74,6 +79,23 @@ import { QuickAdd } from './quick-add';
                 @if (gym()) {
                   <div class="field"><label>Línea</label>
                     <select class="select" [(ngModel)]="p.line"><option [ngValue]="undefined">—</option><option value="hogar">Hogar</option><option value="institucional">Institucional</option><option value="profesional">Profesional</option></select></div>
+                }
+              </div>
+              <div class="field multi">
+                <label class="row"><span class="switch"><input type="checkbox" [ngModel]="!!p.variants?.length" (ngModelChange)="toggleMulti(p, $event)" /><span></span></span> <b>Multiprecio</b>
+                  <small class="muted">El producto viene en varios tipos (peso, talla, medida…) y cada uno tiene su precio.</small></label>
+                @if (p.variants?.length) {
+                  <div class="vrow head"><small>Tipo o descripción</small><small>Precio ({{ currency() }})</small><small>Disponibilidad</small><span></span></div>
+                  @for (v of p.variants; track v.id) {
+                    <div class="vrow">
+                      <input class="input" placeholder="Ej. 10 kg" [(ngModel)]="v.label" />
+                      <input class="input" type="number" min="0" placeholder="Precio" [ngModel]="v.price || null" (ngModelChange)="v.price = +$event || 0" />
+                      <select class="select" [(ngModel)]="v.availability"><option [ngValue]="undefined">Igual al producto</option><option value="tienda">Disponible</option><option value="bodega">Bajo pedido</option><option value="agotado">Agotado</option></select>
+                      <button class="btn ghost icon-only sm" title="Quitar" (click)="removeVariant(p, $index)"><app-icon name="x" [size]="14" /></button>
+                    </div>
+                  }
+                  <button class="btn sm" style="align-self:flex-start" (click)="addVariant(p)"><app-icon name="plus" [size]="13" /> Agregar otro precio</button>
+                  <div class="row vname"><span>El bot pregunta: "¿Qué</span><input class="input" placeholder="peso, talla, color…" [(ngModel)]="p.variantName" /><span>de {{ p.name || 'este producto' }} quieres?"</span></div>
                 }
               </div>
               <div class="field"><label>Fotos y video</label><app-product-media [product]="p" [aiEnabled]="!!auth.modules().aiImages" (changed)="touch()" /></div>
@@ -160,6 +182,14 @@ import { QuickAdd } from './quick-add';
     .pb { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
     .cap { text-transform: capitalize; }
     .price { font-weight: 700; color: var(--brand); }
+    .multi { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .multi > label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+    .multi > label small { font-weight: 400; }
+    .vname { font-size: 13px; flex-wrap: wrap; gap: 6px; }
+    .vname .input { max-width: 160px; }
+    .vrow.head { margin-bottom: 0; color: var(--muted); font-weight: 600; }
+    .vrow { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; margin-bottom: 6px; }
+    @media (max-width: 640px) { .vrow { grid-template-columns: 1fr 1fr auto; } .vrow .select { grid-column: 1 / 3; grid-row: 2; } .vrow.head { display: none; } }
     .kw { margin-top: 4px; }
     .edit { display: grid; grid-template-columns: 1fr 340px; }
     .pv { background: var(--chat-bg); padding: 16px; display: flex; flex-direction: column; gap: 6px; border-left: 1px solid var(--line); }
@@ -249,6 +279,40 @@ export class Catalog {
 
   readonly splitList = splitList;
 
+  /** Multiprecio: al activarlo, el precio único pasa a ser la primera fila; al apagarlo vuelve el precio único. */
+  toggleMulti(p: Product, on: boolean): void {
+    if (on) {
+      p.variants = [{ id: newId('v'), label: '', price: Number(p.price) || 0 }, { id: newId('v'), label: '', price: 0 }];
+      p.variantName ||= 'tipo';
+    } else {
+      if (p.variants?.some((v) => v.label) && !confirm('¿Quitar los precios de este producto?')) {
+        p.variants = [...p.variants]; // el interruptor vuelve a quedar encendido
+        this.touch();
+        return;
+      }
+      p.price = this.lowest(p) || p.price;
+      delete p.variants;
+      delete p.variantName;
+    }
+    this.touch();
+  }
+
+  addVariant(p: Product): void {
+    p.variants = [...(p.variants ?? []), { id: newId('v'), label: '', price: 0 }];
+    this.touch();
+  }
+
+  removeVariant(p: Product, i: number): void {
+    p.variants = p.variants?.filter((_, n) => n !== i);
+    this.touch();
+  }
+
+  /** Precio "desde": el de la opción más barata. */
+  lowest(p: Product): number {
+    const prices = (p.variants ?? []).map((v) => Number(v.price) || 0).filter(Boolean);
+    return prices.length ? Math.min(...prices) : 0;
+  }
+
   preview(p: Product): ChatMessage[] {
     const base = { conversationId: 'pv', direction: 'out' as const, sender: 'bot' as const, createdAt: Date.now(), status: 'read' as const };
     this.rev(); // se recalcula cuando cambian las fotos o el video
@@ -260,6 +324,23 @@ export class Catalog {
 
   async save(p: Product): Promise<void> {
     const clean: Product = { ...p, price: Number(p.price) || 0 };
+    const variants = (p.variants ?? []).map((v) => ({ ...v, label: v.label.trim(), price: Number(v.price) || 0 })).filter((v) => v.label || v.price);
+    if (variants.some((v) => !v.label || !v.price)) {
+      this.store.toast('Cada precio necesita su tipo o descripción y su valor', 'error');
+      return;
+    }
+    if (new Set(variants.map((v) => v.label.toLowerCase())).size < variants.length) {
+      this.store.toast('Hay dos precios con el mismo tipo o descripción', 'error');
+      return;
+    }
+    if (variants.length) {
+      clean.variants = variants.map((v) => (v.availability ? v : { id: v.id, label: v.label, price: v.price }));
+      clean.variantName = p.variantName?.trim() || 'tipo';
+      clean.price = Math.min(...variants.map((v) => v.price));
+    } else {
+      delete clean.variants;
+      delete clean.variantName;
+    }
     for (const k of ['maxUserKg', 'minCeilingCm'] as const) {
       const v = clean[k] as unknown;
       if (v === '' || v === null || v === undefined) delete clean[k];

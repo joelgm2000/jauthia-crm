@@ -28,13 +28,14 @@ Velocidad 1-10 km/h`;
         <div class="modal-head"><app-icon name="sparkles" /><h2>Carga rápida de producto</h2><span class="spacer"></span><button class="btn ghost icon-only sm" (click)="closed.emit()"><app-icon name="x" /></button></div>
         <div class="modal-body">
           <div class="field">
-            <label>Pega el producto como lo escribirías en WhatsApp: nombre, precio y una característica por línea</label>
+            <label>Pega el producto como lo escribirías en WhatsApp: nombre, precio y una característica por línea. Si tiene varios pesos o tallas, una línea por cada uno (ej. "5 kg: 90.000")</label>
             <textarea class="textarea" rows="8" [placeholder]="example" [ngModel]="text()" (ngModelChange)="text.set($event)"></textarea>
           </div>
           @if (parsed(); as r) {
             <div class="guess">
               <b>{{ r.name }}</b>
-              <span>{{ r.price ? (r.price | cop) : 'sin precio' }}</span>
+              <span>{{ r.variants ? 'Desde ' : '' }}{{ r.price ? (r.price | cop) : 'sin precio' }}</span>
+              @for (v of r.variants; track v.id) { <span class="chip">{{ v.label }}: {{ v.price | cop }}</span> }
               @for (s of r.specs; track $index) { <span class="chip">{{ s.label }}: {{ s.value }}</span> }
             </div>
           }
@@ -125,6 +126,7 @@ export class QuickAdd implements OnDestroy {
       category: r.category ?? this.defaultCategory(), subcategory: r.subcategory ?? '',
       imageUrl: '', availability: 'tienda', active: true,
       ...(gym && r.maxUserKg ? { maxUserKg: r.maxUserKg } : {}),
+      ...(r.variants ? { variants: r.variants, variantName: r.variantName } : {}),
     };
     const errors = await addMediaToProduct(product, this.files().map((f) => f.file), (m) => this.busy.set(m));
     this.busy.set(null);

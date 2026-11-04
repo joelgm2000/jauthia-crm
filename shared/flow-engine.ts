@@ -5,9 +5,11 @@
  */
 import { canBeHot, DEFAULT_FLOW, FlowConfig, FlowNode, FlowOption, STAGE_ORDER, stageDef } from './flow';
 import { isOpen, nextOpening } from './hours';
-import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, StageId } from './models';
+import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, ProductVariant, StageId } from './models';
 import { parseNameCity } from './parse';
-import { AVAIL_LABEL, BTN, cartText, cartValue, detectProducts, OutgoingDraft, productCard, productDetails, recommend } from './products';
+import {
+  AVAIL_LABEL, BTN, cartText, cartValue, detectProducts, hasVariants, matchVariant, OutgoingDraft, parseVariantButton, productCard, productDetails, recommend, variantButtonId,
+} from './products';
 import { applyTone, missingRequired, NO_CITY, personaOf, RequiredDatum, requiredOf } from './seller';
 import { hash, includesWord, normalize, titleCase } from './text';
 import { MINUTE } from './time';
@@ -17,6 +19,8 @@ export type TaskDraft = Omit<CrmTask, 'id' | 'createdAt'>;
 
 /** Paso del flujo en el que el bot pregunta si le interesa otro producto antes de pasar al asesor. */
 export const CART_NODE = 'carrito';
+/** Paso en el que el bot pregunta la opción (peso, talla…) de un producto. */
+export const VARIANT_NODE = 'opcion';
 
 export interface EngineInput {
   text?: string;
@@ -216,8 +220,11 @@ class Run {
       }
     }
 
-    // 3) Esperando "¿te interesa otro producto?". Soporte, pagos o "hablar con alguien" siguen su camino.
-    if (c.bot.nodeId === CART_NODE && (!trig || trig.intent === 'compra' || trig.intent === 'precio')) return this.handleCart(input, text, norm);
+    // 3) Esperando "¿te interesa otro producto?" o la opción. Soporte, pagos o "hablar con alguien" siguen su camino.
+    if (!trig || trig.intent === 'compra' || trig.intent === 'precio') {
+      if (c.bot.nodeId === CART_NODE) return this.handleCart(input, text, norm);
+      if (c.bot.nodeId === VARIANT_NODE) return this.handleVariant(text, norm);
+    }
 
     // 4) Disparadores que pasan al asesor sin esperar.
     if (trig) {
@@ -253,6 +260,12 @@ class Run {
           c.bot.awaitingSince = this.ctx.now;
         }
         return;
+      }
+      // "Quiero comprar las mancuernas de 10 kg": con opciones, va al pedido con la que dijo (o se le pregunta).
+      if (trig.intent === 'compra' && mentionedNow.length === 1 && hasVariants(mentionedNow[0])) {
+        this.scoreDelta += trig.score;
+        if (trig.moveTo) this.moveStage(trig.moveTo);
+        return this.chooseProduct(mentionedNow[0], text);
       }
       this.scoreDelta += trig.score;
       this.setIntent(trig.intent, trig.label);
@@ -725,13 +738,13 @@ class Run {
     if (id.startsWith(BTN.select)) {
       const p = this.ctx.products.find((x) => x.id === id.slice(BTN.select.length));
       if (!p) return false;
-      this.addToCart(p);
-      this.scoreDelta += 25;
-      this.scoreFloor = this.ctx.settings.hotThreshold || 70;
-      this.setIntent('compra', `Eligió ${p.name}`, [p.id]);
-      if (p.availability === 'agotado' && !c.tags.includes('agotado')) c.tags.push('agotado');
-      const reason = c.cart!.length > 1 ? `Pedido de ${c.cart!.length} productos` : `Eligió ${p.name}`;
-      this.handoff(reason, 'compra', true, true);
+      this.chooseProduct(p, '');
+      return true;
+    }
+    if (id.startsWith(BTN.variant)) {
+      const hit = parseVariantButton(id, this.ctx.products);
+      if (!hit) return false;
+      this.selectProduct(hit.product, hit.variant);
       return true;
     }
     if (id === BTN.more) {
@@ -750,6 +763,8 @@ class Run {
     const c = this.conv;
     const back = this.flow.messages.backToFlow || 'Ahora sí, sigamos 😊';
     if (c.bot.nodeId === CART_NODE) return this.askMore(c.bot.pendingHandoff?.reason ?? 'Pedido listo', back);
+    const waiting = c.bot.nodeId === VARIANT_NODE && this.ctx.products.find((p) => p.id === c.bot.pendingVariant);
+    if (waiting) return this.askVariant(waiting, back);
     const node = this.node(c.bot.nodeId);
     if (!c.bot.nodeId || !node) {
       const start = this.walk(this.flow.startNode);
@@ -787,20 +802,92 @@ class Run {
   // Pedido con varios productos
   // -------------------------------------------------------------------------
 
-  /** "Lo quiero": agrega el producto al pedido (sin borrar lo que ya eligió). */
-  private addToCart(p: Product): void {
+  /** "Lo quiero": con opciones, usa la que nombra el texto o pregunta cuál quiere. */
+  private chooseProduct(p: Product, text: string): void {
+    if (!hasVariants(p)) return this.selectProduct(p);
+    const v = matchVariant(p, text);
+    if (v) return this.selectProduct(p, v);
+    this.conv.bot.retries = 0;
+    this.scoreDelta += 10;
+    this.setIntent('compra', `Quiere ${p.name}; falta elegir ${(p.variantName || 'la opción').toLowerCase()}`, [p.id]);
+    this.askVariant(p);
+  }
+
+  /** Producto (y opción) elegidos: van al pedido y sigue hacia el asesor. */
+  private selectProduct(p: Product, v?: ProductVariant): void {
+    const c = this.conv;
+    this.addToCart(p, v);
+    c.bot.pendingVariant = undefined;
+    this.scoreDelta += 25;
+    this.scoreFloor = this.ctx.settings.hotThreshold || 70;
+    const name = v ? `${p.name} · ${v.label}` : p.name;
+    this.setIntent('compra', `Eligió ${name}`, [p.id]);
+    if ((v?.availability ?? p.availability) === 'agotado' && !c.tags.includes('agotado')) c.tags.push('agotado');
+    const reason = c.cart!.length > 1 ? `Pedido de ${c.cart!.length} productos` : `Eligió ${name}`;
+    this.handoff(reason, 'compra', true, true);
+  }
+
+  /** "¿Qué peso de Mancuernas quieres?": botones, lista o, si son muchas (WhatsApp admite 10), las escribe. */
+  private askVariant(p: Product, intro?: string): void {
+    const c = this.conv;
+    const options = p.variants ?? [];
+    c.bot.pendingVariant = p.id;
+    c.bot.nodeId = VARIANT_NODE;
+    c.bot.awaitingSince = this.ctx.now;
+    c.bot.lastProductIds = [p.id];
+    const question = (this.flow.messages.askVariant || '¿Qué {opcion} de {producto} quieres? 😊')
+      .replace(/\{opcion\}/g, (p.variantName || 'opción').toLowerCase())
+      .replace(/\{producto\}/g, p.name);
+    const text = this.fill(intro ? `${intro}\n${question}` : question);
+    const buttons = options.map((v) => ({
+      id: variantButtonId(p, v), title: v.label,
+      ...((v.availability ?? p.availability) === 'agotado' ? { description: 'Agotado · se puede apartar' } : {}),
+    }));
+    if (options.length <= 3) this.replies.push({ type: 'buttons', text, buttons });
+    else if (options.length <= 10) this.replies.push({ type: 'list', text, listButton: 'Ver opciones', buttons });
+    else this.say(`${text}\n${options.map((v) => v.label).join(', ')}`);
+  }
+
+  /** Respuesta escrita a "¿qué peso quieres?" (los botones se atienden antes). */
+  private handleVariant(text: string, norm: string): void {
+    const c = this.conv;
+    const p = this.ctx.products.find((x) => x.id === c.bot.pendingVariant);
+    if (!p) {
+      c.bot.nodeId = 'recomendar';
+      return this.say(this.flow.messages.notUnderstood);
+    }
+    const v = matchVariant(p, text);
+    if (v) return this.selectProduct(p, v);
+    const other = detectProducts(text, this.ctx.products).filter((x) => x.id !== p.id);
+    if (other.length || /\b(ninguna|ninguno|no gracias|no quiero|no me interesa)\b/.test(norm)) {
+      c.bot.pendingVariant = undefined;
+      c.bot.nodeId = 'recomendar';
+      c.bot.awaitingSince = this.ctx.now;
+      return other.length ? this.showMentioned(other) : this.noneLiked();
+    }
+    c.bot.retries += 1;
+    if (c.bot.retries >= this.flow.maxRetries) {
+      c.bot.pendingVariant = undefined;
+      c.fields.modeloInteres = p.name;
+      return this.handoff(`Quiere ${p.name} y no se entendió ${(p.variantName || 'la opción').toLowerCase()}`);
+    }
+    this.askVariant(p, this.flow.messages.notUnderstood);
+  }
+
+  /** Agrega el producto al pedido (sin borrar lo que ya eligió). Cada opción cuenta por separado. */
+  private addToCart(p: Product, v?: ProductVariant): void {
     const c = this.conv;
     const cart = c.cart ?? [];
-    if (!cart.some((i) => i.productId === p.id)) {
+    if (!cart.some((i) => i.productId === p.id && i.variantId === v?.id)) {
       // La cantidad que ya dijo vale para este producto solo si no se usó en otro: si no, se le vuelve a preguntar.
       const qty = c.fields.cantidad && !c.bot.qtyUsed ? String(c.fields.cantidad) : '';
       if (qty) c.bot.qtyUsed = true;
       else delete c.fields.cantidad;
-      cart.push({ productId: p.id, name: p.name, price: p.price, qty });
+      cart.push({ productId: p.id, ...(v ? { variantId: v.id } : {}), name: v ? `${p.name} · ${v.label}` : p.name, price: v?.price ?? p.price, qty });
     }
     c.cart = cart;
     c.fields.modeloInteres = p.name;
-    c.fields.disponibilidad = p.availability;
+    c.fields.disponibilidad = v?.availability ?? p.availability;
     if (!c.fields.categoria) c.fields.categoria = p.category;
     if (!c.fields.subcategoria) c.fields.subcategoria = p.subcategory;
     c.value = cartValue(cart);
@@ -831,7 +918,10 @@ class Run {
     const c = this.conv;
     const reason = c.bot.pendingHandoff?.reason ?? 'Pedido listo';
     // "También quiero unas mancuernas": se las mostramos de una vez.
-    const mentioned = input.buttonId ? [] : detectProducts(text, this.ctx.products).filter((p) => !c.cart?.some((i) => i.productId === p.id));
+    // Un producto con opciones puede volver a pedirse con otra opción.
+    const mentioned = input.buttonId ? [] : detectProducts(text, this.ctx.products).filter((p) => hasVariants(p) || !c.cart?.some((i) => i.productId === p.id));
+    const other = mentioned.length === 1 ? matchVariant(mentioned[0], text) : undefined;
+    if (other) return this.selectProduct(mentioned[0], other);
     if (mentioned.length) {
       this.resetInterest();
       this.showMentioned(mentioned);
@@ -842,6 +932,11 @@ class Run {
     }
     const done = input.buttonId === BTN.cartDone || (!input.buttonId && /\b(no|nada|es todo|eso es todo|listo|solo eso|asi esta bien|ya)\b/.test(norm));
     const more = input.buttonId === BTN.cartMore || (!input.buttonId && /\b(si|claro|dale|otro|otra|otros|otras|agregar|anadir|sumar|tambien|mas|ver)\b/.test(norm));
+    // "También 20 kg": otra opción del último producto que eligió.
+    const lastId = c.cart?.[c.cart.length - 1]?.productId;
+    const last = this.ctx.products.find((p) => p.id === lastId);
+    const again = last && !done && !input.buttonId ? matchVariant(last, text) : undefined;
+    if (last && again && !c.cart?.some((i) => i.productId === last.id && i.variantId === again.id)) return this.selectProduct(last, again);
     if (more && !done) return this.startAnother();
     // "No, es todo" o cualquier otra respuesta: quien ya eligió no se queda esperando.
     this.handoff(reason, 'compra');

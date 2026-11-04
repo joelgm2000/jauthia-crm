@@ -1,5 +1,5 @@
 /** Catálogo en el chat: recomendación, tarjetas del carrusel, ficha técnica y detección de productos. */
-import { Availability, CartItem, ChatMessage, Conversation, Product, ProductCard } from './models';
+import { Availability, CartItem, ChatMessage, Conversation, Product, ProductCard, ProductVariant } from './models';
 import { includesWord, normalize } from './text';
 
 /** Mensaje saliente antes de guardarse (sin id, conversación ni fecha). */
@@ -9,11 +9,51 @@ export type OutgoingDraft = Omit<ChatMessage, 'id' | 'conversationId' | 'created
 export const BTN = {
   details: 'det_',
   select: 'sel_',
+  variant: 'var_',
   more: 'more_options',
   none: 'none_liked',
   cartDone: 'cart_done',
   cartMore: 'cart_more',
 } as const;
+
+/** Separa el producto y la opción en el botón de una opción. */
+const VARIANT_SEP = '~';
+
+export const variantButtonId = (p: Product, v: ProductVariant) => BTN.variant + p.id + VARIANT_SEP + v.id;
+
+/** Producto y opción de un botón de opción. */
+export function parseVariantButton(id: string, products: Product[]): { product: Product; variant: ProductVariant } | null {
+  const [productId, variantId] = id.slice(BTN.variant.length).split(VARIANT_SEP);
+  const product = products.find((p) => p.id === productId);
+  const variant = product?.variants?.find((v) => v.id === variantId);
+  return product && variant ? { product, variant } : null;
+}
+
+export const hasVariants = (p: Product) => (p.variants?.length ?? 0) > 0;
+
+/** "Peso", "Talla"… con mayúscula inicial, para mostrarlo en la tarjeta y en la ficha. */
+const optionsTitle = (p: Product) => {
+  const name = p.variantName || 'Opciones';
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+
+const numbersIn = (s: string) => (s.match(/\d+(?:[.,]\d+)?/g) ?? []).map((n) => Number(n.replace(',', '.')));
+
+/** Opción que nombra un texto ("las de 10 kg", "talla m", "2,5"). Si no hay una sola que coincida, ninguna. */
+export function matchVariant(p: Product, text: string): ProductVariant | undefined {
+  const variants = p.variants ?? [];
+  const numbers = numbersIn(text);
+  const byNumber = variants.filter((v) => {
+    const n = numbersIn(v.label);
+    return n.length === 1 && numbers.includes(n[0]);
+  });
+  // "De 2,5 a 10 kg" es un rango, no una elección: se le pregunta.
+  if (byNumber.length > 1) return undefined;
+  const t = normalize(text);
+  const named = variants.filter((v) => includesWord(t, v.label));
+  if (named.length === 1) return named[0];
+  return byNumber[0];
+}
 
 /** Valor estimado del pedido ("2-3" cuenta como 2, "4+" como 4; sin cantidad, 1). */
 export function cartValue(cart: CartItem[]): number {
@@ -50,7 +90,8 @@ export function recommend(conv: Conversation, products: Product[], max: number, 
 
 /** Tarjeta del carrusel: imagen, "Ver detalles" y (opcional) "Lo quiero". */
 export function productCard(p: Product, withSelect = true): ProductCard {
-  const subtitle = [p.maxUserKg ? `Soporta ${p.maxUserKg} kg` : '', p.mode === 'caminar' ? 'Solo caminar' : '', AVAIL_LABEL[p.availability]]
+  const options = hasVariants(p) ? `${optionsTitle(p)}: ${p.variants!.map((v) => v.label).join(', ')}` : '';
+  const subtitle = [options.length > 70 ? `${p.variants!.length} opciones` : options, p.maxUserKg ? `Soporta ${p.maxUserKg} kg` : '', p.mode === 'caminar' ? 'Solo caminar' : '', AVAIL_LABEL[p.availability]]
     .filter(Boolean)
     .join(' · ');
   return {
@@ -67,7 +108,8 @@ export function productCard(p: Product, withSelect = true): ProductCard {
 
 /** Ficha técnica del producto con "Lo quiero" (el pie lleva el nombre del negocio). */
 export function productDetail(p: Product, companyName = ''): OutgoingDraft {
-  const specs = p.specs.map((s) => `• *${s.label}:* ${s.value}`).join('\n');
+  const options = hasVariants(p) ? [{ label: optionsTitle(p), value: p.variants!.map((v) => v.label).join(', ') }] : [];
+  const specs = [...options, ...p.specs].map((s) => `• *${s.label}:* ${s.value}`).join('\n');
   return {
     type: 'product',
     header: p.name,

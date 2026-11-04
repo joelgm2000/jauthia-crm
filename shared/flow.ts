@@ -139,6 +139,8 @@ export interface FlowConfig {
     handoffPayment?: string;
     /** Traspaso cuando pide hablar con una persona. */
     handoffHuman?: string;
+    /** Producto con opciones: "¿Qué {opcion} de {producto} quieres?". */
+    askVariant?: string;
     /** Tras elegir un producto: "¿Quieres agregar otro?" ({pedido} = lista del pedido). */
     askMore?: string;
     /** Cuando quiere agregar otro producto al pedido. */

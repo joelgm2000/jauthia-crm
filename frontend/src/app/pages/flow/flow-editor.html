@@ -222,6 +222,7 @@
               <label class="row" style="gap:6px"><input type="checkbox" [ngModel]="f.askMoreProducts !== false" (ngModelChange)="f.askMoreProducts = $event; touch()" /> Tras cada "Lo quiero", preguntar si le interesa otro producto</label>
             </div>
             @if (f.askMoreProducts !== false) {
+              <div class="field"><label>Producto con opciones ({{ '{' }}opcion{{ '}' }} = peso, talla… · {{ '{' }}producto{{ '}' }} = su nombre)</label><textarea class="textarea" [(ngModel)]="f.messages.askVariant" (ngModelChange)="touch()" placeholder="¿Qué {opcion} de {producto} quieres? 😊"></textarea></div>
               <div class="grid-3">
                 <div class="field"><label>Pregunta tras elegir ({{ '{' }}pedido{{ '}' }} = lista)</label><textarea class="textarea" [(ngModel)]="f.messages.askMore" (ngModelChange)="touch()" placeholder="¡Listo! 🛒 Tu pedido va así: {pedido} ¿Te interesa alguno de nuestros otros productos?"></textarea></div>
                 <div class="field"><label>Cuando dice que sí</label><textarea class="textarea" [(ngModel)]="f.messages.addAnother" (ngModelChange)="touch()" placeholder="¡Claro! 😊 ¿Qué otro producto te gustaría ver?"></textarea></div>

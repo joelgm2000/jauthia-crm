@@ -7,9 +7,10 @@
  *   MOTOR 1.5 AC                  → ficha: Motor = 1.5 AC
  *   Soporte de peso Max 90 kg     → ficha: Soporte de peso máx. = 90 kg  (y peso máximo del usuario = 90)
  *   Velocidad: 1-10 km/h          → ficha: Velocidad = 1-10 km/h
+ *   5 kg: 90.000                  → opción "5 kg" a $90.000 (desde dos líneas así, el producto tiene opciones)
  *   Ideal para caminar en casa    → descripción
  */
-import { CatalogCategory, ProductSpec } from './models';
+import { CatalogCategory, ProductSpec, ProductVariant } from './models';
 import { includesWord, normalize } from './text';
 
 export interface ParsedProduct {
@@ -21,11 +22,15 @@ export interface ParsedProduct {
   category?: string;
   subcategory?: string;
   maxUserKg?: number;
+  variantName?: string;
+  variants?: ProductVariant[];
 }
 
 const BULLET = /^[\s\-•*·▪►✓✔→]+/;
 const PRICE_LINE = /^(precio|valor|price)?\s*[:=-]?\s*(\$|cop|usd)?\s*\d[\d.,\s]*\s*(\$|cop|usd|pesos)?$/i;
 const KEY_VALUE = /^([^:=]{2,40})\s*[:=]\s*(.+)$/;
+/** "5 kg: 90.000", "2,5 kg - $45.000", "Talla M 80.000" */
+const VARIANT_LINE = /^(\d[\d.,]*\s*(?:kg|kilos?|lb|libras?|gr?|cm|mts?|ml|l)|talla\s+\S{1,5})\s*[:=\-–]?\s*\$?\s*(\d[\d.,]{2,})\s*(?:cop|pesos)?$/i;
 
 /** "1.889.900" / "$1,889,900 COP" / "1889900.50" → número. */
 export function parsePrice(s: string): number {
@@ -71,8 +76,14 @@ export function parseProductText(text: string, categories: CatalogCategory[] = [
   let price = 0;
   const specs: ProductSpec[] = [];
   const notes: string[] = [];
+  const options: { label: string; price: number; line: string }[] = [];
 
   for (const line of lines) {
+    const opt = name ? line.match(VARIANT_LINE) : null;
+    if (opt) {
+      options.push({ label: opt[1].replace(/\s+/g, ' ').trim(), price: parsePrice(opt[2]), line });
+      continue;
+    }
     const kv = line.match(KEY_VALUE);
     const key = kv ? normalize(kv[1]) : '';
     if (!price && (PRICE_LINE.test(line) || (kv && /^(precio|valor)/.test(key)))) {
@@ -101,6 +112,15 @@ export function parseProductText(text: string, categories: CatalogCategory[] = [
     else notes.push(line);
   }
 
+  // Una sola línea así no son opciones: es un dato de la ficha.
+  if (options.length === 1) {
+    const [label_, value] = options[0].line.split(/\s*[:=\-–]\s*/);
+    if (value) specs.push({ label: label(label_), value: value.trim() });
+    else notes.push(options[0].line);
+  }
+  const variants: ProductVariant[] = options.length > 1 ? options.map((o, i) => ({ id: `v${i + 1}`, label: o.label, price: o.price })) : [];
+  if (variants.length) price = Math.min(...variants.map((v) => v.price));
+
   const weight = specs.find((s) => /peso|soporta|usuario|capacidad/i.test(s.label) && /kg/i.test(s.value));
   const maxUserKg = weight ? Number(weight.value.match(/(\d+(?:[.,]\d+)?)\s*kg/i)?.[1].replace(',', '.')) || undefined : undefined;
   const type = detectType(text, categories);
@@ -111,5 +131,6 @@ export function parseProductText(text: string, categories: CatalogCategory[] = [
   const words = normalize(name).split(' ').filter((w) => w.length > 2 && !/^\d+$/.test(w));
   const keywords = [...new Set([normalize(name), ...words, ...(type.subcategory ? [type.subcategory] : [])])].filter(Boolean).slice(0, 12);
 
-  return { name, price, specs, description, keywords, ...type, ...(maxUserKg ? { maxUserKg } : {}) };
+  const optionName = /talla/i.test(variants[0]?.label ?? '') ? 'Talla' : /kg|kilo|lb|libra|\bg/i.test(variants[0]?.label ?? '') ? 'Peso' : 'Medida';
+  return { name, price, specs, description, keywords, ...type, ...(maxUserKg ? { maxUserKg } : {}), ...(variants.length ? { variants, variantName: optionName } : {}) };
 }

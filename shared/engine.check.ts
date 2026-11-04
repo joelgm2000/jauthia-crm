@@ -79,7 +79,11 @@ const step = (input: EngineInput) => {
 };
 const pesas = SEED_PRODUCTS.find((p) => p.id === multi.bot.lastProductIds[0])!;
 step({ buttonId: 'sel_' + pesas.id });
+step({ text: 'las de 10 kg' });
 step({ buttonId: 'qty_2' });
+step({ text: 'también 5 kg' });
+step({ buttonId: 'qty_1' });
+step({ text: 'de 2,5 a 20 kg' });
 step({ text: 'no, eso es todo gracias' });
 console.log('CART', mc.cart, 'VALUE', mc.value, 'BOT', mc.botActive, 'STAGE', mc.stage);
 

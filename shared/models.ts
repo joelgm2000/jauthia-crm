@@ -58,6 +58,15 @@ export interface ProductSpec {
   value: string;
 }
 
+/** Opción de un producto (ej. "10 kg", "Talla M"): cada una con su precio. */
+export interface ProductVariant {
+  id: string;
+  label: string;
+  price: number;
+  /** Si falta, vale la del producto. */
+  availability?: Availability;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -71,7 +80,12 @@ export interface Product {
   gallery?: string[];
   /** Video MP4 que el bot envía con la ficha ("Ver detalles"). */
   videoUrl?: string;
+  /** Con opciones, es el precio más bajo ("desde"). */
   price: number;
+  /** Qué elige el cliente (ej. "Peso", "Talla"). */
+  variantName?: string;
+  /** Opciones del producto; el bot pregunta cuál quiere antes de agregarlo al pedido. */
+  variants?: ProductVariant[];
   /** Línea (gimnasios): hogar, institucional o profesional. */
   line?: (typeof PRODUCT_LINES)[number];
   availability: Availability;
@@ -193,11 +207,15 @@ export interface BotState {
   qtyUsed?: boolean;
   /** Un asesor le devolvió la conversación al bot después de un traspaso. */
   resumed?: boolean;
+  /** Producto del que se le preguntó la opción (peso, talla…). */
+  pendingVariant?: string;
 }
 
 /** Un producto del pedido del cliente (puede llevar varios). */
 export interface CartItem {
   productId: string;
+  /** Opción elegida (el nombre ya la incluye: "Mancuernas · 10 kg"). */
+  variantId?: string;
   name: string;
   price: number;
   /** Cantidad tal como la eligió el cliente ("1", "2-3", "4+"); vacía mientras no la diga. */

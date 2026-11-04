@@ -70,6 +70,10 @@ contacto, **qué contrató** (CRM, Chatbot o ambos), plan, mensualidad, día de 
   **Carga rápida:** pega el producto como lo escribirías en WhatsApp (nombre, precio y una característica por línea)
   y adjunta las fotos y un video MP4: se organiza solo (precio, ficha técnica, peso máximo, categoría y palabras clave)
   y se abre el editor para revisar. Las fotos se reducen a JPG antes de subirlas y el video se envía con "Ver detalles".
+  **Multiprecio:** un producto puede venir en varios tipos (peso, talla, medida…), cada uno con su precio y
+  disponibilidad. Al tocar "Lo quiero", el bot pregunta cuál quiere (o lo entiende si escribe "las de 10 kg"; un rango
+  como "de 2,5 a 10" no cuenta como elección), y cada tipo entra al pedido por separado con su precio y su cantidad.
+  En la carga rápida basta una línea por tipo ("5 kg: 90.000").
 - **IA de imágenes (módulo opcional):** el súper admin la activa por cliente. Genera fotos del producto
   (fondo de estudio, en ambiente o publicitaria) a partir de la foto principal. Usa la clave de Gemini que el súper
   admin pone en *Editar cliente* (se guarda cifrada y nadie puede volver a verla) o, si el cliente no tiene, la de la

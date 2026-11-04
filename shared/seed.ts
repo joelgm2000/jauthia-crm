@@ -108,8 +108,15 @@ export const SEED_PRODUCTS: Product[] = [
   {
     id: 'manc-hex', name: 'Mancuernas hexagonales', category: 'peso-libre', subcategory: 'mancuernas', line: 'hogar',
     keywords: ['mancuerna', 'mancuernas', 'pesas'], imageUrl: img('mancuernas'),
-    price: 18000, availability: 'tienda', active: true,
-    description: 'Mancuernas hexagonales recubiertas en caucho. Precio por kg.',
+    price: 45000, availability: 'tienda', active: true,
+    variantName: 'Peso',
+    variants: [
+      { id: 'kg2-5', label: '2,5 kg', price: 45000 },
+      { id: 'kg5', label: '5 kg', price: 90000 },
+      { id: 'kg10', label: '10 kg', price: 180000 },
+      { id: 'kg20', label: '20 kg', price: 360000, availability: 'bodega' },
+    ],
+    description: 'Mancuernas hexagonales recubiertas en caucho.',
     specs: [{ label: 'Rango', value: '2,5 a 40 kg' }, { label: 'Regla de pares', value: '2,5–10 kg: 4 pares · 12,5–17,5: 2 · 20+: 1' }],
   },
   {

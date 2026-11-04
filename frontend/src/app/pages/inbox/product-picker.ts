@@ -30,7 +30,7 @@ import { CopPipe } from '../../ui/pipes';
                 <img [src]="p.imageUrl" [alt]="p.name" />
                 <span class="check"><app-icon name="check" [size]="14" /></span>
                 <b>{{ p.name }}</b>
-                <small>{{ p.price | cop }} · {{ p.availability }}</small>
+                <small>{{ p.variants?.length ? 'Desde ' : '' }}{{ p.price | cop }} · {{ p.availability }}</small>
               </button>
             }
           </div>
