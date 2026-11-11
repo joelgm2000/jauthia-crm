@@ -14,7 +14,7 @@ import { ApiError } from './auth';
 import { config } from './config';
 import { settingsWithTeam } from './core';
 import { getDoc, listDocs, listMessages } from './db';
-import { errorMessage, fetchJson } from './http';
+import { geminiError, geminiGenerate } from './gemini';
 import { log } from './log';
 import { METHOD_PRIVACY, SALES_METHOD } from './playbook';
 import { id, short } from './schemas';
@@ -71,10 +71,6 @@ function extractJson(s: string): unknown {
   } catch {
     return null;
   }
-}
-
-interface GeminiResponse {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
 }
 
 export const assistRouter = Router();
@@ -138,15 +134,8 @@ Reglas:
 ${METHOD_PRIVACY}
 - Responde SOLO con JSON: {"reply": "mensaje para el cliente", "why": "por qué este mensaje, en una frase para el asesor", "stage": "etapa de la venta en la que va (ej. descubrimiento, objeción, cierre)", "alt": "una alternativa más corta o con otro enfoque"}`;
 
-  const url = `${config.aiBaseUrl}/v1beta/models/${encodeURIComponent(config.aiTextModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const r = await fetchJson<GeminiResponse>(url, {
-    body: { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.5 } },
-    timeoutMs: 60_000,
-  });
-  if (!r.ok) {
-    log.warn('Sugerencia de respuesta: la IA falló', { status: r.status, error: errorMessage(r) });
-    throw new ApiError(502, 'La IA no pudo sugerir una respuesta. Intenta de nuevo.');
-  }
+  const r = await geminiGenerate(apiKey, { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.5 } }, 60_000);
+  if (!r.ok) throw geminiError(r, 'Sugerencia de respuesta');
   const text = (r.json.candidates?.[0]?.content?.parts ?? []).map((x) => x.text ?? '').join('');
   const out = outSchema.safeParse(extractJson(text) ?? {});
   const reply = out.success ? out.data.reply.trim().slice(0, 1500) : '';

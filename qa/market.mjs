@@ -117,6 +117,10 @@ const mock = createServer((req, res) => {
     const key = new URL(req.url, 'http://x').searchParams.get('key');
     seen.push({ url: req.url, key, body, prompt });
     if (mode === 'slow') await new Promise((r) => setTimeout(r, 1500));
+    if (mode === 'busy-once') {
+      mode = 'ok';
+      return res.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { message: 'The model is overloaded' } }));
+    }
     if (mode === 'error') return res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { message: 'API key not valid' } }));
     if (prompt.includes('Eres un verificador de datos')) {
       const names = [...prompt.matchAll(/^(\d+)\. (.+?) — /gm)];
@@ -286,6 +290,10 @@ check('Id inválido: 400', (await call('/api/assist/reply', { method: 'POST', ja
 mode = 'error';
 const sgErr = await call('/api/assist/reply', { method: 'POST', jar: 'adm', body: { conversationId: convId } });
 check('Si la IA falla: 502 sin mostrar el error interno', sgErr.status === 502 && !/API key not valid/.test(sgErr.text), sgErr.text);
+check('El mensaje dice la causa: Google rechazó la clave', sgErr.text.includes('rechazó la clave'), sgErr.text);
+mode = 'busy-once';
+const sgBusy = await call('/api/assist/reply', { method: 'POST', jar: 'adm', body: { conversationId: convId } });
+check('Google saturado (503) una vez: reintenta solo y entrega la sugerencia', sgBusy.status === 200 && sgBusy.json.reply.includes('caminar o para trotar'), sgBusy.text);
 mode = 'ok';
 const after = await call('/api/market', { jar: 'adm' });
 check('Historial: 5 análisis guardados y 15 disponibles hoy', after.json.reports.length === 5 && after.json.remainingToday === 15, `${after.json.reports.length} ${after.json.remainingToday}`);

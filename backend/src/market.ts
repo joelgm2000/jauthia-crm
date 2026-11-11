@@ -32,7 +32,8 @@ import { ApiError, getTenant } from './auth';
 import { config } from './config';
 import { invalidateCtx } from './core';
 import { listDocs, pool } from './db';
-import { errorMessage, fetchJson } from './http';
+import { fetchJson } from './http';
+import { geminiError, geminiGenerate } from './gemini';
 import { log } from './log';
 import { businessProfile, short } from './schemas';
 import { getAiKey } from './secrets';
@@ -395,24 +396,11 @@ ${RULES}
 // Gemini con búsqueda de Google
 // ---------------------------------------------------------------------------
 
-interface GeminiTextResponse {
-  candidates?: {
-    content?: { parts?: { text?: string }[] };
-    groundingMetadata?: { groundingChunks?: { web?: { uri?: string; title?: string } }[] };
-  }[];
-}
-
 async function research(apiKey: string, prompt: string, search = true): Promise<{ json: unknown; sources: MarketSource[] }> {
-  const url = `${config.aiBaseUrl}/v1beta/models/${encodeURIComponent(config.aiTextModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const r = await fetchJson<GeminiTextResponse>(url, {
-    // Sin búsqueda (estadísticas reales) la IA solo trabaja con los números que le damos.
-    body: { contents: [{ parts: [{ text: prompt }] }], ...(search ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: search ? 0.6 : 0.3 } },
-    timeoutMs: 180_000,
-  });
-  if (!r.ok) {
-    log.warn('Inteligencia de mercado: la IA falló', { status: r.status, error: errorMessage(r) });
-    throw new ApiError(502, 'La IA no pudo hacer el análisis. Intenta de nuevo en un momento.');
-  }
+  // Sin búsqueda (estadísticas reales) la IA solo trabaja con los números que le damos.
+  const body = { contents: [{ parts: [{ text: prompt }] }], ...(search ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: search ? 0.6 : 0.3 } };
+  const r = await geminiGenerate(apiKey, body, 180_000);
+  if (!r.ok) throw geminiError(r, 'Inteligencia de mercado');
   const cand = r.json.candidates?.[0];
   const out = (cand?.content?.parts ?? []).map((p) => p.text ?? '').join('');
   const json = extractJson(out);

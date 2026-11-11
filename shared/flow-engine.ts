@@ -10,7 +10,7 @@ import {
 } from './citas';
 import { isOpen, nextOpening } from './hours';
 import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, ProductVariant, StageId } from './models';
-import { parseNameCity } from './parse';
+import { parseCorrection, parseNameCity } from './parse';
 import {
   AVAIL_LABEL, BTN, cartText, cartValue, detectProducts, hasVariants, matchVariant, OutgoingDraft, parseVariantButton, productCard, productDetails, recommend, variantButtonId,
 } from './products';
@@ -326,6 +326,9 @@ class Run {
       return;
     }
 
+    // "Me llamo Joel" / "soy de Bosconia": el cliente corrige su nombre o su ciudad en cualquier momento.
+    if (node.parse !== 'name_city' && node.parse !== 'city' && this.correctData(text, node)) return;
+
     // 6) Esperando elección de las fichas.
     if (node.kind === 'recommend') {
       const mentioned = detectProducts(text, this.ctx.products);
@@ -473,7 +476,12 @@ class Run {
       if (node.field === 'uso') {
         const tag = opt.value === 'hogar' ? 'hogar' : 'gym';
         if (!c.tags.includes(tag)) c.tags.push(tag);
-        if (tag === 'gym') c.priority = 'alta';
+        if (tag === 'gym') {
+          c.priority = 'alta';
+          // Gimnasio o negocio: lo atiende un asesor enseguida (aunque el flujo guardado siga con más preguntas).
+          this.handoff(`Eligió "${opt.title.replace(/^[^\p{L}\d]+/u, '')}"`);
+          return true;
+        }
       }
       if (opt.value === 'no-sabe') {
         this.handoff('No sabe qué necesita');
@@ -500,14 +508,14 @@ class Run {
       if (node.field === 'alturaTecho' && n < 10) n = Math.round(n * 100);
       if (node.field && node.field !== 'nombre_ciudad') (c.fields as Record<string, unknown>)[node.field] = n;
     } else if (node.parse === 'name_city') {
-      const { name, city } = parseNameCity(text);
+      const { name, city } = parseNameCity(text, [this.ctx.settings.freeShippingCity]);
       if (!name && !city) return false;
       if (name) ack = this.setName(name);
       this.setCity(city ?? NO_CITY);
     } else if (node.parse === 'city') {
       // "Bosconia" o "María, de Valledupar": se toma la ciudad (y el nombre si aún no lo había dicho).
       if (norm.length < 2) return false;
-      const { name, city } = parseNameCity(text);
+      const { name, city } = parseNameCity(text, [this.ctx.settings.freeShippingCity]);
       if (city && name && !c.bot.nameGiven) ack = this.setName(name);
       this.setCity(city ?? titleCase(text.trim().replace(/^(?:de|desde|en)\s+/i, '').slice(0, 60)));
     } else {
@@ -637,7 +645,38 @@ class Run {
     const c = this.conv;
     c.fields.ciudad = city;
     const freeCity = normalize(this.ctx.settings.freeShippingCity);
-    if (city !== NO_CITY && freeCity && !normalize(city).includes(freeCity) && !c.tags.includes('fuera-de-valledupar')) c.tags.push('fuera-de-valledupar');
+    const outside = city !== NO_CITY && !!freeCity && !normalize(city).includes(freeCity);
+    if (outside && !c.tags.includes('fuera-de-valledupar')) c.tags.push('fuera-de-valledupar');
+    // Corrigió la ciudad y ahora sí está en la zona de envío gratis: se quita la etiqueta.
+    if (!outside && city !== NO_CITY) c.tags = c.tags.filter((t) => t !== 'fuera-de-valledupar');
+  }
+
+  /**
+   * "Me llamo Joel" / "soy de Bosconia" en medio de otra pregunta: corrige el dato, lo confirma
+   * y vuelve a hacer la pregunta en la que iba. Devuelve false si el mensaje no era una corrección.
+   */
+  private correctData(text: string, node: FlowNode): boolean {
+    const c = this.conv;
+    const fix = parseCorrection(text, [this.ctx.settings.freeShippingCity]);
+    const sameName = !!fix.name && c.bot.nameGiven && normalize(fix.name) === normalize(c.name);
+    const sameCity = !!fix.city && normalize(fix.city) === normalize(String(c.fields.ciudad ?? ''));
+    if ((!fix.name || sameName) && (!fix.city || sameCity)) return false;
+    const before = `${c.name} / ${c.fields.ciudad ?? NO_CITY}`;
+    if (fix.name && !sameName) {
+      // Había respondido al revés ("Valledupar, Joel"): si su nombre real quedó como ciudad, la ciudad era el "nombre".
+      const oldName = c.bot.nameGiven ? c.name : '';
+      if (!fix.city && oldName && normalize(String(c.fields.ciudad ?? '')) === normalize(fix.name)) fix.city = oldName;
+      this.setName(fix.name);
+    }
+    if (fix.city) this.setCity(fix.city);
+    this.notes.push(`El cliente corrigió sus datos: ${before} → ${c.name} / ${c.fields.ciudad ?? NO_CITY}.`);
+    const nombre = c.name.split(' ')[0];
+    const ack = fix.name && !sameName
+      ? `¡Gracias, ${nombre}! Ya lo corregí 😊${fix.city ? ` (ciudad: ${c.fields.ciudad})` : ''}`
+      : `Listo, ${nombre}, ya anoté que nos escribes desde ${c.fields.ciudad} 😊`;
+    if (node.kind === 'question') this.ask(node, ack);
+    else this.say(ack);
+    return true;
   }
 
   /** Hay un traspaso en espera: pide el siguiente dato que falte o, si ya están todos, pasa al asesor. */
