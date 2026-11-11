@@ -1,14 +1,21 @@
+# syntax=docker/dockerfile:1
 # ---------- Compilación ----------
 # Debian (glibc): los binarios nativos de Angular/esbuild funcionan igual en x86 y en ARM (Oracle Ampere).
 FROM node:22-bookworm-slim AS build
 WORKDIR /src
-COPY shared ./shared
+# Primero SOLO las dependencias: esta capa queda en caché y no se reinstala mientras
+# no cambien los package.json (antes "shared" iba aquí y obligaba a reinstalar todo en cada cambio).
 COPY frontend/package*.json ./frontend/
 COPY backend/package*.json ./backend/
-RUN npm --prefix frontend ci && npm --prefix backend ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm --prefix frontend ci --prefer-offline --no-audit --no-fund \
+ && npm --prefix backend ci --prefer-offline --no-audit --no-fund
+COPY shared ./shared
 COPY frontend ./frontend
 COPY backend ./backend
-RUN npm --prefix frontend run build && npm --prefix backend run build \
+# La caché de Angular se guarda entre compilaciones: solo recompila lo que cambió.
+RUN --mount=type=cache,target=/src/frontend/.angular/cache \
+    npm --prefix frontend run build && npm --prefix backend run build \
  && npm --prefix backend prune --omit=dev
 
 # ---------- Ejecución ----------
