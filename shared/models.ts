@@ -3,6 +3,7 @@
  * No importar nada de Angular ni de Node aquí: lo usan el frontend y el backend.
  */
 import type { BusinessProfile } from './market';
+import type { Cita, CitaKind } from './citas';
 
 export type ChannelType =
   | 'whatsapp'
@@ -97,6 +98,8 @@ export interface Product {
   mode?: (typeof USE_MODES)[number];
   /** Fuerza: altura mínima de techo en cm. */
   minCeilingCm?: number;
+  /** Garantía de este producto ("1 año", "6 meses", "Sin garantía"). Vacía: no se menciona. */
+  warranty?: string;
   active: boolean;
 }
 
@@ -209,6 +212,12 @@ export interface BotState {
   resumed?: boolean;
   /** Producto del que se le preguntó la opción (peso, talla…). */
   pendingVariant?: string;
+  /** Citas: día elegido (2026-11-14) mientras se pregunta la hora. */
+  citaDia?: string;
+  /** Citas: en la tienda o por videollamada. */
+  citaKind?: CitaKind;
+  /** Citas: pregunta del flujo en la que estaba antes de pedir la cita (para volver si no agenda). */
+  citaFrom?: string;
 }
 
 /** Un producto del pedido del cliente (puede llevar varios). */
@@ -258,6 +267,8 @@ export interface Conversation {
   waitingSince?: number | null;
   /** Última alerta de compra recibida (para no saturar al cliente). */
   lastAlertAt?: number;
+  /** Cita en la tienda o por videollamada que agendó con el bot (o el asesor). */
+  cita?: Cita | null;
 }
 
 export interface CrmTask {

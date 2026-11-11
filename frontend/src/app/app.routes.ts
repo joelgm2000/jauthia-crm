@@ -17,6 +17,7 @@ export const routes: Routes = [
       { path: 'pipeline', canActivate: [moduleGuard('crm')], loadComponent: () => import('./pages/pipeline/pipeline').then((m) => m.Pipeline) },
       { path: 'contacts', canActivate: [moduleGuard('crm')], loadComponent: () => import('./pages/contacts/contacts').then((m) => m.Contacts) },
       { path: 'tasks', canActivate: [moduleGuard('crm')], loadComponent: () => import('./pages/tasks/tasks').then((m) => m.Tasks) },
+      { path: 'citas', loadComponent: () => import('./pages/citas/citas').then((m) => m.Citas) },
       { path: 'catalog', loadComponent: () => import('./pages/catalog/catalog').then((m) => m.Catalog) },
       { path: 'templates', loadComponent: () => import('./pages/templates/templates').then((m) => m.Templates) },
       { path: 'flow', canActivate: [moduleGuard('chatbot')], loadComponent: () => import('./pages/flow/flow-editor').then((m) => m.FlowEditor) },

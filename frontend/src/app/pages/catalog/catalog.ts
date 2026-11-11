@@ -101,9 +101,12 @@ import { QuickAdd } from './quick-add';
               <div class="field"><label>Fotos y video</label><app-product-media [product]="p" [aiEnabled]="!!auth.modules().aiImages" (changed)="touch()" /></div>
               <div class="field"><label>Descripción</label><textarea class="textarea" [(ngModel)]="p.description"></textarea></div>
               <div class="field"><label>Palabras clave que activan el producto (separadas por coma)</label><input class="input" [ngModel]="p.keywords.join(', ')" (ngModelChange)="p.keywords = splitList($event)" /></div>
-              <div class="grid-2">
+              <div class="grid-3">
                 <div class="field"><label>Disponibilidad</label>
                   <select class="select" [(ngModel)]="p.availability"><option value="tienda">Disponible (entrega inmediata)</option><option value="bodega">Bajo pedido / en bodega</option><option value="agotado">Agotado</option></select></div>
+                <div class="field"><label>Garantía</label>
+                  <input class="input" maxlength="60" list="warranties" placeholder="Ej. 1 año, 6 meses, sin garantía" [ngModel]="p.warranty ?? ''" (ngModelChange)="p.warranty = $event.trim() ? $event : undefined" />
+                  <datalist id="warranties"><option value="3 meses"></option><option value="6 meses"></option><option value="1 año"></option><option value="2 años"></option><option value="Sin garantía"></option></datalist></div>
                 <label class="row" style="margin-top:22px"><span class="switch"><input type="checkbox" [(ngModel)]="p.active" /><span></span></span> Activo (el bot lo recomienda)</label>
               </div>
               @if (gym()) {

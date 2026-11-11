@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, u
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DEFAULT_FLOW, FlowConfig, FlowNode, STAGES } from '@shared/flow';
+import { citasOf, CitasConfig } from '@shared/citas';
 import { CrmStore } from '../../core/data/crm-store';
 import { Icon } from '../../ui/icon';
 import { ensureSellerConfig, SellerPanel } from './seller-panel';
 import { splitList } from '@shared/text';
 import { FIELD_LABELS } from '../../ui/labels';
 
-type Tab = 'vendedor' | 'preguntas' | 'disparadores' | 'faqs' | 'mensajes';
+type Tab = 'vendedor' | 'preguntas' | 'disparadores' | 'faqs' | 'mensajes' | 'citas';
 
 const ROUTE_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#14b8a6', '#6366f1', '#f97316'];
 
@@ -44,6 +45,13 @@ export class FlowEditor {
       const f = this.store.flow();
       if (!untracked(this.dirty)) this.flow.set(ensureSellerConfig(structuredClone(f)));
     });
+  }
+
+  /** Configuración de citas del flujo (la crea con los valores por defecto si no existe). */
+  citasCfg(f: FlowConfig): CitasConfig {
+    if (!f.citas) f.citas = structuredClone(citasOf(f));
+    else if (!f.citas.messages?.alternatives) f.citas = structuredClone(citasOf(f));
+    return f.citas;
   }
 
   byRoute(route: string): FlowNode[] {

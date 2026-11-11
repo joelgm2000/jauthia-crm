@@ -3,6 +3,7 @@
  * Los valores posibles (etapas, roles, estados…) salen de /shared para que no se desincronicen.
  */
 import { z } from 'zod';
+import { CITA_KINDS, CITA_STATUSES } from '../../shared/citas';
 import { EDITABLE_FIELDS } from '../../shared/actions';
 import { ApiAction, PASSWORD_MIN, TENANT_ROLES } from '../../shared/api';
 import { PRODUCT_IMAGE, STAGES, TRIGGER_INTENTS } from '../../shared/flow';
@@ -67,6 +68,7 @@ const edit = z.object({
   value: z.number().min(0).max(1e12).optional(),
   clearIntent: z.boolean().optional(),
   markRead: z.boolean().optional(),
+  cita: z.object({ at: z.number(), status: z.enum(CITA_STATUSES), createdAt: z.number(), kind: z.enum(CITA_KINDS).optional() }).nullable().optional(),
 });
 
 const task = z.object({
@@ -83,7 +85,7 @@ const product = z.object({
   line: z.enum(PRODUCT_LINES).optional(), availability: z.enum(AVAILABILITIES),
   description: short(2000), specs: z.array(z.object({ label: short(60), value: short(200) })).max(30),
   maxUserKg: z.number().min(0).max(1000).optional(), mode: z.enum(USE_MODES).optional(),
-  minCeilingCm: z.number().min(0).max(2000).optional(), active: z.boolean(),
+  minCeilingCm: z.number().min(0).max(2000).optional(), warranty: short(60).optional(), active: z.boolean(),
 });
 
 const template = z.object({
@@ -154,6 +156,14 @@ const flow = z.object({
   })).max(15).optional(),
   messages: z.record(z.string().max(40), short(1024)),
   askMoreProducts: z.boolean().optional(),
+  citas: z.object({
+    enabled: z.boolean(), keywords: z.array(short(60).min(1)).max(40), address: short(200),
+    daysAhead: z.number().int().min(1).max(30), slotMinutes: z.number().int().min(15).max(240), offerOnHandoff: z.boolean(),
+    messages: z.object({
+      offer: short(1024), askDay: short(1024), askTime: short(1024), confirm: short(1024),
+      alternatives: short(1024), confirmVideoCall: short(1024), videoLater: short(1024), delivery: short(1024),
+    }),
+  }).optional(),
   cartWaitMinutes: z.number().int().min(5).max(24 * 60).optional(),
 });
 

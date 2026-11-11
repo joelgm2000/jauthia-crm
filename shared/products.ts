@@ -115,12 +115,20 @@ export function productDetail(p: Product, companyName = ''): OutgoingDraft {
     header: p.name,
     imageUrl: p.imageUrl,
     text: `${p.description}\n\n${specs}\n\n📦 ${AVAIL_LABEL[p.availability]}`,
-    footer: companyName ? `${companyName} · Garantía 1 año` : 'Garantía 1 año',
+    footer: [companyName, warrantyLabel(p.warranty)].filter(Boolean).join(' · ').slice(0, 60) || undefined,
     buttons: [
       { id: BTN.select + p.id, title: 'Lo quiero' },
       { id: BTN.more, title: 'Ver otras opciones' },
     ],
   };
+}
+
+/** "Garantía 1 año", "Sin garantía" o vacío si el producto no la tiene escrita. */
+export function warrantyLabel(w: string | undefined): string {
+  const t = (w ?? '').trim();
+  if (!t) return '';
+  if (/^sin/i.test(t) || /garant/i.test(t)) return t.charAt(0).toUpperCase() + t.slice(1);
+  return `Garantía ${t}`;
 }
 
 /** "Ver detalles": el video del producto (si tiene) y luego la ficha con los botones. */

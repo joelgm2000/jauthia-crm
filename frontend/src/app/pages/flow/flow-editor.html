@@ -17,6 +17,7 @@
     <button [class.on]="tab() === 'disparadores'" (click)="tab.set('disparadores')">Cuándo pasa al asesor</button>
     <button [class.on]="tab() === 'faqs'" (click)="tab.set('faqs')">Preguntas frecuentes</button>
     <button [class.on]="tab() === 'mensajes'" (click)="tab.set('mensajes')">Mensajes y parámetros</button>
+    <button [class.on]="tab() === 'citas'" (click)="tab.set('citas')">Citas</button>
   </div>
 
   @if (flow(); as f) {
@@ -192,6 +193,40 @@
             }
             <button class="btn sm" style="align-self:flex-start" (click)="addFaq()"><app-icon name="plus" [size]="13" /> Pregunta frecuente</button>
             <div class="hint"><app-icon name="clock" [size]="15" /> Los mensajes cuando el cliente deja de contestar se configuran en <a routerLink="/automation">Remarketing y alertas</a>.</div>
+          </div>
+        </div>
+      }
+
+      @case ('citas') {
+        @let ct = citasCfg(f);
+        <div class="card">
+          <div class="card-head"><h2>Citas</h2></div>
+          <div class="card-pad col" style="gap:12px">
+            <label class="row" style="gap:8px"><span class="switch"><input type="checkbox" [(ngModel)]="ct.enabled" (ngModelChange)="touch()" /><span></span></span> <b>Agendar citas desde el chat</b></label>
+            <p class="muted" style="margin:0">El cliente elige el día y la hora en que pasa por la tienda. Las horas salen del horario de atención (Configuración). Las citas quedan en la pantalla <b>Citas</b> y como tarea para la asesora. Si el cliente no puede venir, el bot le ofrece un video corto, una videollamada o la entrega a domicilio.</p>
+            @if (ct.enabled) {
+              <div class="grid-3">
+                <div class="field"><label>Dirección de la tienda</label><input class="input" maxlength="200" [(ngModel)]="ct.address" (ngModelChange)="touch()" placeholder="Calle 16 # 10-20, Valledupar" /></div>
+                <div class="field"><label>Días hacia adelante para agendar</label><input class="input" type="number" min="1" max="30" [ngModel]="ct.daysAhead" (ngModelChange)="ct.daysAhead = +$event || 7; touch()" /></div>
+                <div class="field"><label>Horas disponibles cada</label>
+                  <select class="select" [ngModel]="ct.slotMinutes" (ngModelChange)="ct.slotMinutes = +$event; touch()"><option [ngValue]="30">30 minutos</option><option [ngValue]="60">1 hora</option><option [ngValue]="120">2 horas</option></select></div>
+              </div>
+              <label class="row" style="gap:6px"><input type="checkbox" [(ngModel)]="ct.offerOnHandoff" (ngModelChange)="touch()" /> Al pasar al asesor, ofrecer los botones "Agendar cita" y "No puedo ir"</label>
+              <div class="field"><label>Palabras con las que el cliente pide una cita (separadas por coma)</label><input class="input" [ngModel]="ct.keywords.join(', ')" (ngModelChange)="ct.keywords = splitList($event); touch()" /></div>
+              <div class="grid-2">
+                <div class="field"><label>Ofrecer la cita al pasar al asesor</label><textarea class="textarea" [(ngModel)]="ct.messages.offer" (ngModelChange)="touch()"></textarea></div>
+                <div class="field"><label>Pregunta del día</label><textarea class="textarea" [(ngModel)]="ct.messages.askDay" (ngModelChange)="touch()"></textarea></div>
+                <div class="field"><label>Pregunta de la hora ({{ '{' }}dia{{ '}' }} = el día elegido)</label><textarea class="textarea" [(ngModel)]="ct.messages.askTime" (ngModelChange)="touch()"></textarea></div>
+                <div class="field"><label>Confirmación ({{ '{' }}nombre{{ '}' }}, {{ '{' }}fecha{{ '}' }}, {{ '{' }}hora{{ '}' }}, {{ '{' }}direccion{{ '}' }})</label><textarea class="textarea" [(ngModel)]="ct.messages.confirm" (ngModelChange)="touch()"></textarea></div>
+              </div>
+              <div class="sub-head"><b>Si no puede venir</b></div>
+              <div class="grid-2">
+                <div class="field"><label>Opciones (video, videollamada o domicilio)</label><textarea class="textarea" [(ngModel)]="ct.messages.alternatives" (ngModelChange)="touch()"></textarea></div>
+                <div class="field"><label>Confirmación de la videollamada</label><textarea class="textarea" [(ngModel)]="ct.messages.confirmVideoCall" (ngModelChange)="touch()"></textarea></div>
+                <div class="field"><label>Pide video y el producto no tiene uno en el catálogo</label><textarea class="textarea" [(ngModel)]="ct.messages.videoLater" (ngModelChange)="touch()"></textarea></div>
+                <div class="field"><label>Entrega a domicilio</label><textarea class="textarea" [(ngModel)]="ct.messages.delivery" (ngModelChange)="touch()"></textarea></div>
+              </div>
+            }
           </div>
         </div>
       }

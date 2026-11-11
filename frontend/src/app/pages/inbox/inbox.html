@@ -193,6 +193,14 @@
           </div>
         </div>
 
+        @if (c.cita; as ct) {
+          <div class="block cart">
+            <span class="label"><app-icon name="clock" [size]="13" /> Cita · {{ citaStatus[ct.status] }}</span>
+            <div class="cart-row"><span>{{ citaText(ct) }}</span></div>
+            <a class="btn sm" routerLink="/citas" style="align-self:flex-start">Ver citas</a>
+          </div>
+        }
+
         @if (c.cart?.length) {
           <div class="block cart">
             <span class="label"><app-icon name="box" [size]="13" /> Pedido ({{ c.cart!.length }})</span>

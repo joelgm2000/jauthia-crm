@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CrmStore } from '../core/data/crm-store';
+import { citasOf, dateKeyOf } from '@shared/citas';
 import { Icon } from '../ui/icon';
 import { InitialsPipe } from '../ui/pipes';
 
@@ -15,6 +16,8 @@ interface NavItem {
   module?: 'crm' | 'chatbot' | 'market';
   /** Solo para administradores del cliente. */
   admin?: boolean;
+  /** Se muestra solo si devuelve true. */
+  show?: () => boolean;
 }
 
 @Component({
@@ -128,6 +131,7 @@ export class Shell {
     { path: '/pipeline', label: 'Embudo de ventas', icon: 'kanban', badge: () => this.store.hotLeads().length, badgeKind: 'hot', module: 'crm' },
     { path: '/contacts', label: 'Contactos', icon: 'users', module: 'crm' },
     { path: '/tasks', label: 'Tareas', icon: 'tasks', badge: () => this.overdue(), module: 'crm' },
+    { path: '/citas', label: 'Citas', icon: 'clock', badge: () => this.citasToday(), show: () => this.citasOn() },
     { path: '/catalog', label: 'Catálogo', icon: 'box' },
     { path: '/templates', label: 'Plantillas WhatsApp', icon: 'template' },
     { path: '/flow', label: 'Flujo del bot', icon: 'flow', module: 'chatbot', admin: true },
@@ -141,7 +145,16 @@ export class Shell {
   readonly visibleNav = computed(() => {
     const mods = this.auth.modules();
     const admin = this.auth.isAdmin();
-    return this.nav.filter((i) => (!i.module || mods[i.module]) && (!i.admin || admin));
+    return this.nav.filter((i) => (!i.module || mods[i.module]) && (!i.admin || admin) && (!i.show || i.show()));
+  });
+
+  /** Citas activadas en el flujo, o ya hay alguna agendada. */
+  readonly citasOn = computed(() => citasOf(this.store.flow()).enabled || this.store.conversations().some((c) => !!c.cita));
+  /** Citas agendadas para hoy. */
+  readonly citasToday = computed(() => {
+    const tz = this.store.settings().hours.timezone;
+    const today = dateKeyOf(Date.now(), tz);
+    return this.store.conversations().filter((c) => c.cita?.status === 'agendada' && dateKeyOf(c.cita.at, tz) === today).length;
   });
 
   readonly overdue = computed(() => this.store.openTasks().filter((t) => t.dueAt <= Date.now()).length);

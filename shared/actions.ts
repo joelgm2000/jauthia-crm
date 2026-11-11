@@ -4,6 +4,7 @@
  * y el modo demo del navegador las usa para simular el mismo comportamiento.
  */
 import { canBeHot, stageDef } from './flow';
+import type { Cita } from './citas';
 import { OutgoingDraft } from './products';
 import { ContactFields, Conversation, StageId } from './models';
 
@@ -23,6 +24,8 @@ export interface ConversationEdit {
   value?: number;
   clearIntent?: boolean;
   markRead?: boolean;
+  /** Cambiar el estado de la cita (asistió, no vino, cancelada) o quitarla (null). */
+  cita?: Cita | null;
 }
 
 export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<Conversation> {
@@ -42,6 +45,7 @@ export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<C
   if (edit.value !== undefined) patch.value = Math.max(0, Math.round(edit.value));
   if (edit.clearIntent) patch.intent = null;
   if (edit.markRead) patch.unread = 0;
+  if (edit.cita !== undefined) patch.cita = edit.cita;
   return patch;
 }
 

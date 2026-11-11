@@ -4,6 +4,10 @@
  * Lo usan el backend Node/Express (backend/src/core.ts) y el modo demo del navegador.
  */
 import { canBeHot, DEFAULT_FLOW, FlowConfig, FlowNode, FlowOption, STAGE_ORDER, stageDef } from './flow';
+import {
+  CITA_BTN, CITA_DAY_NODE, CITA_TIME_NODE, CitaKind, cannotCome, citaLabel, citasOf, dateKeyOf, dayButtonId, dayLong,
+  isValidSlot, localToUtc, openDays, parseDay, parseTime, parseTimeButton, slotsFor, timeButtonId, timeLabel,
+} from './citas';
 import { isOpen, nextOpening } from './hours';
 import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, ProductVariant, StageId } from './models';
 import { parseNameCity } from './parse';
@@ -121,6 +125,9 @@ class Run {
   /** En este turno ya se dijo el saludo completo del nodo inicial. */
   private greeted = false;
 
+  /** No ofrecer la cita en el traspaso (ya se está hablando de citas). */
+  private noCitaOffer = false;
+
   constructor(private ctx: EngineContext, private flow: FlowConfig) {
     // Copia profunda para no mutar el estado del llamador.
     this.conv = JSON.parse(JSON.stringify(ctx.conv)) as Conversation;
@@ -164,6 +171,7 @@ class Run {
       name: c.name,
       value: c.value,
       ...(c.cart ? { cart: c.cart } : {}),
+      ...(c.cita !== undefined ? { cita: c.cita } : {}),
     };
     return { replies: this.replies, patch, tasks: this.tasks, notes: this.notes };
   }
@@ -196,11 +204,13 @@ class Run {
           this.scoreDelta += 10;
         }
       }
+      // Botones de citas (se ofrecen al pasar al asesor): funcionan aunque el bot esté en pausa.
+      if (input.buttonId) this.handleCitaButton(input.buttonId);
       return;
     }
 
-    // 1) Botones de las tarjetas de producto (válidos en cualquier punto del flujo).
-    if (input.buttonId && this.handleProductButton(input.buttonId)) return;
+    // 1) Botones de las tarjetas de producto y de las citas (válidos en cualquier punto del flujo).
+    if (input.buttonId && (this.handleProductButton(input.buttonId) || this.handleCitaButton(input.buttonId))) return;
 
     // 2) Pregunta frecuente ("¿hacen envíos?"): responde y retoma el control de la conversación.
     const faq = input.buttonId ? undefined : (this.flow.faqs ?? []).find((f) => f.keywords.some((k) => includesWord(norm, k)));
@@ -208,7 +218,7 @@ class Run {
     // Un disparador cuya palabra es parte de la pregunta frecuente ("¿tiene garantía?") no cuenta.
     let trig = this.flow.triggers.find((t) => t.keywords.some((k) => includesWord(norm, k) && !(faqKw && faqKw.includes(normalize(k)))));
     if (faq) {
-      this.say(faq.answer);
+      this.say(this.warrantyAnswer(faq.keywords, text) ?? faq.answer);
       this.scoreDelta += 2;
       const mentionedFaq = detectProducts(text, this.ctx.products);
       // "¿Cuánto vale el envío?" es una duda de la FAQ, no una solicitud de cotización.
@@ -218,6 +228,15 @@ class Run {
         this.resume();
         return;
       }
+    }
+
+    // Citas: respondiendo qué día / a qué hora, o pide una cita ("¿puedo pasar por la tienda?").
+    const service = trig && (trig.intent === 'soporte' || trig.intent === 'pago' || trig.intent === 'humano');
+    if (!service && (c.bot.nodeId === CITA_DAY_NODE || c.bot.nodeId === CITA_TIME_NODE)) return this.handleCitaText(text);
+    const citas = citasOf(this.flow);
+    if (citas.enabled && !service && !faq && !input.buttonId) {
+      if (citas.keywords.some((k) => includesWord(norm, k))) return this.startCita('tienda');
+      if (cannotCome(text) && c.bot.nodeId !== CART_NODE && c.bot.nodeId !== VARIANT_NODE) return this.offerAlternatives();
     }
 
     // 3) Esperando "¿te interesa otro producto?" o la opción. Soporte, pagos o "hablar con alguien" siguen su camino.
@@ -454,9 +473,15 @@ class Run {
       if (node.field === 'uso') {
         const tag = opt.value === 'hogar' ? 'hogar' : 'gym';
         if (!c.tags.includes(tag)) c.tags.push(tag);
+        if (tag === 'gym') c.priority = 'alta';
       }
       if (opt.value === 'no-sabe') {
         this.handoff('No sabe qué necesita');
+        return true;
+      }
+      // Opción que lleva directo al traspaso (ej. "Gimnasio/negocio"): pasa al asesor enseguida, sin más preguntas.
+      if (opt.next && this.node(opt.next)?.kind === 'handoff') {
+        this.handoff(`Eligió "${opt.title.replace(/^[^\p{L}\d]+/u, '')}"`);
         return true;
       }
       // "¿Tienen mancuernas?" responde también la pregunta siguiente (qué tipo de peso libre): no se la hacemos.
@@ -765,6 +790,8 @@ class Run {
     if (c.bot.nodeId === CART_NODE) return this.askMore(c.bot.pendingHandoff?.reason ?? 'Pedido listo', back);
     const waiting = c.bot.nodeId === VARIANT_NODE && this.ctx.products.find((p) => p.id === c.bot.pendingVariant);
     if (waiting) return this.askVariant(waiting, back);
+    if (c.bot.nodeId === CITA_DAY_NODE) return this.askCitaDay(c.bot.citaKind ?? 'tienda', back);
+    if (c.bot.nodeId === CITA_TIME_NODE && c.bot.citaDia) return this.askCitaTime(c.bot.citaKind ?? 'tienda', c.bot.citaDia, back);
     const node = this.node(c.bot.nodeId);
     if (!c.bot.nodeId || !node) {
       const start = this.walk(this.flow.startNode);
@@ -1005,6 +1032,18 @@ class Run {
     } else {
       this.say(node?.message ?? this.flow.messages.handoff);
     }
+    const citas = citasOf(this.flow);
+    const upcoming = c.cita && c.cita.status === 'agendada' && c.cita.at > this.ctx.now;
+    if (!service && citas.enabled && citas.offerOnHandoff && !upcoming && !this.noCitaOffer) {
+      this.replies.push({
+        type: 'buttons',
+        text: this.fill(citas.messages.offer),
+        buttons: [
+          { id: CITA_BTN.start, title: '📅 Agendar cita' },
+          { id: CITA_BTN.cannot, title: 'No puedo ir' },
+        ],
+      });
+    }
     if (!open) this.say(s.hours.outOfHoursMessage);
 
     this.moveStage('asesor');
@@ -1018,6 +1057,265 @@ class Run {
     this.tasks.push({
       conversationId: c.id,
       title: `${service ? SERVICE_HANDOFF[service].task : 'Cotizar a'} ${c.name}`,
+      detail: `${reason}. ${c.summary}`,
+      dueAt: open ? this.ctx.now : nextOpening(s, this.ctx.now),
+      done: false,
+      priority: c.priority,
+      assignedTo: c.assignedTo ?? null,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Citas: en la tienda, o videollamada / video / domicilio para quien no puede venir
+  // -------------------------------------------------------------------------
+
+  /** "¿Cuánto tiempo de garantía tiene?" sobre un producto con garantía propia: responde la de ese producto. */
+  private warrantyAnswer(keywords: string[], text: string): string | undefined {
+    if (!keywords.some((k) => normalize(k).includes('garantia'))) return undefined;
+    const mentioned = detectProducts(text, this.ctx.products);
+    const last = this.conv.bot.lastProductIds.length === 1 ? this.ctx.products.find((p) => p.id === this.conv.bot.lastProductIds[0]) : undefined;
+    const p = mentioned.length === 1 ? mentioned[0] : mentioned.length ? undefined : last;
+    if (!p?.warranty?.trim()) return undefined;
+    const w = p.warranty.trim();
+    return /^sin\b/i.test(w) ? `${p.name} no tiene garantía.` : `🛡️ ${p.name} tiene ${/garant/i.test(w) ? w : `${w} de garantía`}.`;
+  }
+
+  /** ¿El bot lleva la conversación? Con el bot en pausa los botones responden, pero no se cambia en qué pregunta va. */
+  private get tracking(): boolean {
+    return this.conv.botActive;
+  }
+
+  private handleCitaButton(id: string): boolean {
+    const citas = citasOf(this.flow);
+    if (!citas.enabled) return false;
+    if (id === CITA_BTN.start) return this.startCita('tienda'), true;
+    if (id === CITA_BTN.videoCall) return this.startCita('videollamada'), true;
+    if (id === CITA_BTN.cannot) return this.offerAlternatives(), true;
+    if (id === CITA_BTN.video) return this.sendVideo(), true;
+    if (id === CITA_BTN.delivery) return this.delivery(), true;
+    if (id.startsWith(CITA_BTN.day) || id.startsWith(CITA_BTN.vday)) {
+      const kind: CitaKind = id.startsWith(CITA_BTN.vday) ? 'videollamada' : 'tienda';
+      this.askCitaTime(kind, id.replace(/^[a-z]+_/, ''));
+      return true;
+    }
+    if (id.startsWith(CITA_BTN.time) || id.startsWith(CITA_BTN.vtime)) {
+      const t = parseTimeButton(id);
+      if (!t) return false;
+      this.bookCita(id.startsWith(CITA_BTN.vtime) ? 'videollamada' : 'tienda', t.key, t.minutes);
+      return true;
+    }
+    return false;
+  }
+
+  private startCita(kind: CitaKind): void {
+    const c = this.conv;
+    if (this.tracking && c.bot.nodeId !== CITA_DAY_NODE && c.bot.nodeId !== CITA_TIME_NODE) c.bot.citaFrom = c.bot.nodeId;
+    this.scoreDelta += 10;
+    this.askCitaDay(kind);
+  }
+
+  private askCitaDay(kind: CitaKind, intro?: string): void {
+    const c = this.conv;
+    const citas = citasOf(this.flow);
+    const days = openDays(this.ctx.settings, this.ctx.now, citas.daysAhead, citas.slotMinutes);
+    if (!days.length) {
+      this.noCitaOffer = true;
+      return this.handoff(kind === 'videollamada' ? 'Quiere una videollamada y no hay horarios disponibles' : 'Quiere una cita y no hay horarios disponibles');
+    }
+    const ask = kind === 'videollamada' ? '📹 ¿Qué día te queda bien la videollamada?' : this.fill(citas.messages.askDay);
+    const text = intro ? `${intro}\n${ask}` : ask;
+    const rows = days.slice(0, kind === 'tienda' ? 9 : 10).map((d) => ({ id: dayButtonId(kind, d.key), title: d.title, description: d.description }));
+    // En la tienda, la última fila es "No puedo ir" (video, videollamada o domicilio).
+    if (kind === 'tienda') rows.push({ id: CITA_BTN.cannot, title: 'No puedo ir', description: 'Video, videollamada o envío a domicilio' });
+    if (rows.length <= 3) this.replies.push({ type: 'buttons', text, buttons: rows.map(({ id, title }) => ({ id, title })) });
+    else this.replies.push({ type: 'list', text, listButton: 'Ver días', buttons: rows });
+    if (this.tracking) {
+      c.bot.nodeId = CITA_DAY_NODE;
+      c.bot.citaKind = kind;
+      c.bot.awaitingSince = this.ctx.now;
+    }
+  }
+
+  private askCitaTime(kind: CitaKind, key: string, intro?: string): void {
+    const c = this.conv;
+    const citas = citasOf(this.flow);
+    const slots = slotsFor(this.ctx.settings, key, this.ctx.now, citas.slotMinutes);
+    if (!slots.length) return this.askCitaDay(kind, `Ese día ya no tenemos horarios disponibles 😅`);
+    const ask = (citas.messages.askTime || '').replace(/\{dia\}/g, dayLong(key));
+    const text = intro ? `${intro}\n${this.fill(ask)}` : this.fill(ask);
+    const rows = slots.map((m) => ({ id: timeButtonId(kind, key, m), title: timeLabel(m) }));
+    if (rows.length <= 3) this.replies.push({ type: 'buttons', text, buttons: rows });
+    else this.replies.push({ type: 'list', text, listButton: 'Ver horas', buttons: rows });
+    if (this.tracking) {
+      c.bot.nodeId = CITA_TIME_NODE;
+      c.bot.citaKind = kind;
+      c.bot.citaDia = key;
+      c.bot.awaitingSince = this.ctx.now;
+    }
+  }
+
+  /** Respuesta escrita mientras se pregunta el día o la hora. */
+  private handleCitaText(text: string): void {
+    const c = this.conv;
+    const kind = c.bot.citaKind ?? 'tienda';
+    const norm = normalize(text);
+    const citas = citasOf(this.flow);
+    if (kind === 'tienda' && cannotCome(text)) return this.offerAlternatives();
+    if (/^(no|no gracias|mejor no|cancelar|ahora no|despues|después|luego)\b/.test(norm)) {
+      c.bot.nodeId = c.bot.citaFrom ?? '';
+      c.bot.citaFrom = undefined;
+      c.bot.citaDia = undefined;
+      c.bot.citaKind = undefined;
+      this.say('Listo 😊 Cuando quieras agendamos.');
+      return this.resume();
+    }
+    const tz = this.ctx.settings.hours.timezone;
+    const days = openDays(this.ctx.settings, this.ctx.now, citas.daysAhead, citas.slotMinutes);
+    const day = parseDay(text, days, dateKeyOf(this.ctx.now, tz));
+    if (c.bot.nodeId === CITA_DAY_NODE) {
+      if (day) {
+        const t = parseTime(text, true);
+        return t !== undefined ? this.bookCita(kind, day, t) : this.askCitaTime(kind, day);
+      }
+    } else {
+      const key = day ?? c.bot.citaDia;
+      const t = parseTime(text, !!day);
+      if (key && t !== undefined) return this.bookCita(kind, key, t);
+      if (day) return this.askCitaTime(kind, day);
+    }
+    c.bot.retries += 1;
+    if (c.bot.retries > this.flow.maxRetries) {
+      this.noCitaOffer = true;
+      return this.handoff(kind === 'videollamada' ? 'Quiere una videollamada y no se entendió la fecha' : 'Quiere una cita y no se entendió la fecha');
+    }
+    const sorry = c.bot.nodeId === CITA_DAY_NODE ? 'No te entendí el día 😅 Elige uno de la lista:' : 'No te entendí la hora 😅 Elige una de la lista:';
+    if (c.bot.nodeId === CITA_TIME_NODE && c.bot.citaDia) this.askCitaTime(kind, c.bot.citaDia, sorry);
+    else this.askCitaDay(kind, sorry);
+  }
+
+  private bookCita(kind: CitaKind, key: string, minutes: number): void {
+    const c = this.conv;
+    const s = this.ctx.settings;
+    if (!isValidSlot(s, key, minutes, this.ctx.now)) return this.askCitaTime(kind, key, `A esa hora no podemos atenderte 😅`);
+    const citas = citasOf(this.flow);
+    const at = localToUtc(key, minutes, s.hours.timezone);
+    const changed = c.cita && c.cita.status === 'agendada' && c.cita.at > this.ctx.now;
+    c.cita = { at, status: 'agendada', createdAt: this.ctx.now, ...(kind === 'videollamada' ? { kind } : {}) };
+    const tpl = kind === 'videollamada' ? citas.messages.confirmVideoCall : citas.messages.confirm;
+    const address = citas.address.trim();
+    this.say(
+      tpl
+        .replace(/\{nombre\}/g, c.bot.nameGiven ? c.name.split(' ')[0] : '')
+        .replace(/\{fecha\}/g, dayLong(key))
+        .replace(/\{hora\}/g, timeLabel(minutes))
+        .replace(/\{dia\}/g, dayLong(key))
+        .replace(/\{direccion\}/g, address ? ` 📍 ${address}.` : '')
+        .replace(/, !/g, '!')
+        .replace(/\s+([.,!])/g, '$1'),
+    );
+    const what = kind === 'videollamada' ? 'Videollamada' : 'Cita en la tienda';
+    const when = citaLabel(at, s.hours.timezone);
+    this.notes.push(`📅 ${changed ? 'Cambió su' : 'Agendó'} ${what.toLowerCase()}: ${when}`);
+    this.scoreDelta += 20;
+    this.setIntent('compra', `${what}: ${when}`);
+    // Lo atiende un asesor: queda asignado, el bot en pausa y la tarea a la hora de la cita.
+    this.moveStage('asesor');
+    const wasTracking = this.tracking;
+    c.bot.citaDia = undefined;
+    c.bot.citaKind = undefined;
+    c.bot.citaFrom = undefined;
+    c.bot.pendingHandoff = null;
+    c.bot.awaitingSince = undefined;
+    if (wasTracking) {
+      c.botActive = false;
+      c.bot.nodeId = 'handoff';
+    }
+    const advisors = s.advisors.filter((a) => a.active);
+    if (!c.assignedTo && advisors.length) c.assignedTo = advisors[Math.abs(hash(c.id)) % advisors.length].id;
+    c.summary = buildSummary(c, this.ctx.products);
+    this.tasks.push({
+      conversationId: c.id,
+      title: `${what}: ${c.name}`,
+      detail: `${when}. ${c.summary}`,
+      dueAt: at,
+      done: false,
+      priority: 'alta',
+      assignedTo: c.assignedTo ?? null,
+    });
+  }
+
+  /** "No puedo ir": video corto, videollamada o entrega a domicilio. */
+  private offerAlternatives(): void {
+    const citas = citasOf(this.flow);
+    this.replies.push({
+      type: 'buttons',
+      text: this.fill(citas.messages.alternatives),
+      buttons: [
+        { id: CITA_BTN.video, title: '🎬 Ver video' },
+        { id: CITA_BTN.videoCall, title: '📹 Videollamada' },
+        { id: CITA_BTN.delivery, title: '🚚 A domicilio' },
+      ],
+    });
+    if (this.tracking) {
+      // Ya no está eligiendo día: vuelve a donde iba y espera que toque una opción.
+      if (this.conv.bot.nodeId === CITA_DAY_NODE || this.conv.bot.nodeId === CITA_TIME_NODE) this.conv.bot.nodeId = this.conv.bot.citaFrom ?? this.conv.bot.nodeId;
+      this.conv.bot.awaitingSince = this.ctx.now;
+    }
+  }
+
+  /** Productos de los que habla el cliente: el pedido, o lo último que vio. */
+  private productsOfInterest(): Product[] {
+    const c = this.conv;
+    const ids = c.cart?.length ? c.cart.map((i) => i.productId) : c.bot.lastProductIds;
+    return [...new Set(ids)].map((id) => this.ctx.products.find((p) => p.id === id)).filter((p): p is Product => !!p);
+  }
+
+  private sendVideo(): void {
+    const withVideo = this.productsOfInterest().filter((p) => p.videoUrl).slice(0, 3);
+    if (withVideo.length) {
+      for (const p of withVideo) this.replies.push({ type: 'video', videoUrl: p.videoUrl!, text: `🎬 ${p.name}` });
+      this.say('¿Qué te pareció? 😊 Si quieres verlo en vivo, también podemos hacer una videollamada.');
+      this.setIntent('producto', 'Pidió video del equipo', withVideo.map((p) => p.id));
+      this.scoreDelta += 10;
+      if (this.tracking) this.conv.bot.awaitingSince = this.ctx.now;
+      return;
+    }
+    // Sin video en el catálogo: una asesora lo graba y se lo envía.
+    this.say(citasOf(this.flow).messages.videoLater);
+    this.noCitaOffer = true;
+    this.quietHandoff('Pide un video corto del equipo', 'Enviar video del equipo a');
+  }
+
+  private delivery(): void {
+    const c = this.conv;
+    this.say(citasOf(this.flow).messages.delivery);
+    if (!c.tags.includes('domicilio')) c.tags.push('domicilio');
+    this.scoreDelta += 15;
+    this.noCitaOffer = true;
+    this.quietHandoff('Quiere entrega a domicilio', 'Coordinar entrega a domicilio de');
+  }
+
+  /** Pasa al asesor sin otro mensaje (el bot ya le dijo qué sigue al cliente). */
+  private quietHandoff(reason: string, taskTitle: string): void {
+    const c = this.conv;
+    const s = this.ctx.settings;
+    const open = isOpen(s, this.ctx.now);
+    if (!open) this.say(s.hours.outOfHoursMessage);
+    this.setIntent('compra', reason);
+    this.moveStage('asesor');
+    c.bot.pendingHandoff = null;
+    c.bot.awaitingSince = undefined;
+    if (this.tracking) {
+      c.botActive = false;
+      c.bot.nodeId = 'handoff';
+    }
+    const advisors = s.advisors.filter((a) => a.active);
+    if (!c.assignedTo && advisors.length) c.assignedTo = advisors[Math.abs(hash(c.id)) % advisors.length].id;
+    c.summary = buildSummary(c, this.ctx.products);
+    this.notes.push(`🤝 Traspaso al asesor: ${reason}`);
+    this.tasks.push({
+      conversationId: c.id,
+      title: `${taskTitle} ${c.name}`,
       detail: `${reason}. ${c.summary}`,
       dueAt: open ? this.ctx.now : nextOpening(s, this.ctx.now),
       done: false,

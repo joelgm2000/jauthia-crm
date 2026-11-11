@@ -14,6 +14,8 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { convVars, outsideWindow } from '@shared/automation';
 import { STAGES, stageDef } from '@shared/flow';
+import { CITA_KIND_LABEL, CITA_STATUS_LABEL, citaLabel } from '@shared/citas';
+import type { Cita } from '@shared/citas';
 import { templateDrafts } from '@shared/templates';
 import { HOUR } from '@shared/time';
 import { productCard, productDetail } from '@shared/products';
@@ -51,6 +53,12 @@ type ComposerMode = 'reply' | 'note' | 'simulate';
 })
 export class Inbox {
   readonly store = inject(CrmStore);
+  readonly citaStatus = CITA_STATUS_LABEL;
+
+  /** "Cita en la tienda · viernes 16 de octubre, 3:00 pm". */
+  citaText(c: Cita): string {
+    return `${CITA_KIND_LABEL[c.kind ?? 'tienda']} · ${citaLabel(c.at, this.store.settings().hours.timezone)}`;
+  }
   private auth = inject(AuthService);
   private router = inject(Router);
 

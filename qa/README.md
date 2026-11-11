@@ -15,6 +15,7 @@ sh restart.sh
 node conversations.mjs        # 12 conversaciones del bot      → results/conversations.json
 node shots.mjs tenant         # capturas del CRM               → results/shots/
 node automation.mjs           # remarketing y alertas de compra → results/automation.json
+sh restart.sh && node conversations.mjs && node citas.mjs   # citas, garantía y gimnasio → asesor (con capturas)
 node shots.mjs auto           # capturas de esos chats y de la pantalla de remarketing
 node load.mjs 50,200,500,1000,2000   # masividad               → results/load.json
 node shots.mjs super          # captura del panel de la plataforma

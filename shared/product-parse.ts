@@ -24,6 +24,7 @@ export interface ParsedProduct {
   maxUserKg?: number;
   variantName?: string;
   variants?: ProductVariant[];
+  warranty?: string;
 }
 
 const BULLET = /^[\s\-•*·▪►✓✔→]+/;
@@ -121,6 +122,9 @@ export function parseProductText(text: string, categories: CatalogCategory[] = [
   const variants: ProductVariant[] = options.length > 1 ? options.map((o, i) => ({ id: `v${i + 1}`, label: o.label, price: o.price })) : [];
   if (variants.length) price = Math.min(...variants.map((v) => v.price));
 
+  // "Garantía: 6 meses" va al campo de garantía del producto, no a la ficha.
+  const wIdx = specs.findIndex((s) => /garant/i.test(s.label));
+  const warranty = wIdx >= 0 ? specs.splice(wIdx, 1)[0].value : '';
   const weight = specs.find((s) => /peso|soporta|usuario|capacidad/i.test(s.label) && /kg/i.test(s.value));
   const maxUserKg = weight ? Number(weight.value.match(/(\d+(?:[.,]\d+)?)\s*kg/i)?.[1].replace(',', '.')) || undefined : undefined;
   const type = detectType(text, categories);
@@ -132,5 +136,5 @@ export function parseProductText(text: string, categories: CatalogCategory[] = [
   const keywords = [...new Set([normalize(name), ...words, ...(type.subcategory ? [type.subcategory] : [])])].filter(Boolean).slice(0, 12);
 
   const optionName = /talla/i.test(variants[0]?.label ?? '') ? 'Talla' : /kg|kilo|lb|libra|\bg/i.test(variants[0]?.label ?? '') ? 'Peso' : 'Medida';
-  return { name, price, specs, description, keywords, ...type, ...(maxUserKg ? { maxUserKg } : {}), ...(variants.length ? { variants, variantName: optionName } : {}) };
+  return { name, price, specs, description, keywords, ...type, ...(maxUserKg ? { maxUserKg } : {}), ...(warranty ? { warranty } : {}), ...(variants.length ? { variants, variantName: optionName } : {}) };
 }

@@ -5,6 +5,7 @@
  */
 import { ContactFields, StageDef, StageId } from './models';
 import { DEFAULT_REQUIRED, RequiredDatum, SellerPersona } from './seller';
+import type { CitasConfig } from './citas';
 
 export type NodeKind = 'question' | 'recommend' | 'handoff';
 
@@ -104,6 +105,8 @@ export interface FlowConfig {
   faqs?: FaqEntry[];
   /** Quién es el vendedor virtual (nombre, rol, tono, reglas y prompt). */
   persona?: SellerPersona;
+  /** Citas en la tienda (y videollamada / domicilio para quien no puede venir). */
+  citas?: CitasConfig;
   /** Datos que el vendedor SIEMPRE debe conocer (y cuándo pedirlos). Si falta, se usan DEFAULT_REQUIRED. */
   required?: RequiredDatum[];
   messages: {
@@ -223,7 +226,7 @@ export const DEFAULT_FLOW: FlowConfig = {
       display: 'buttons', field: 'uso', parse: 'choice', next: 'equipo',
       options: [
         { id: 'uso_hogar', title: '🏠 Para mi casa', value: 'hogar', synonyms: ['casa', 'hogar', 'personal', 'apartamento'] },
-        { id: 'uso_negocio', title: '🏋️ Gimnasio/negocio', value: 'negocio', synonyms: ['gimnasio', 'gym', 'negocio', 'empresa', 'club', 'conjunto'] },
+        { id: 'uso_negocio', title: '🏋️ Gimnasio/negocio', value: 'negocio', next: 'handoff', synonyms: ['gimnasio', 'gym', 'negocio', 'empresa', 'club', 'conjunto'] },
       ],
     },
     {
@@ -402,7 +405,7 @@ export const DEFAULT_FLOW: FlowConfig = {
   faqs: [
     { id: 'faq_envios', keywords: ['envio', 'envío', 'envian', 'envían', 'domicilio', 'despacho', 'despachan', 'hacen envios', 'llega a'], answer: '🚚 Sí, enviamos a toda Colombia. En Valledupar el envío y la instalación son gratis; para otras ciudades se cotiza aparte.' },
     { id: 'faq_horario', keywords: ['horario', 'a que hora', 'a qué hora', 'abren', 'cierran', 'atienden'], answer: '🕑 Atendemos de lunes a viernes de 8:30 a 12:30 y de 2:30 a 6:30, y los sábados de 9:00 a 5:00.' },
-    { id: 'faq_garantia_tiempo', keywords: ['cuanto tiempo de garantia', 'cuánto tiempo de garantía', 'tiene garantia', 'tiene garantía', 'traen garantia'], answer: '✅ Todos los equipos tienen 1 año de garantía por defectos de fábrica.' },
+    { id: 'faq_garantia_tiempo', keywords: ['cuanto tiempo de garantia', 'cuánto tiempo de garantía', 'tiene garantia', 'tiene garantía', 'traen garantia'], answer: '🛡️ La garantía depende de cada equipo: la ves en la ficha (toca *Ver detalles*) y la asesora te la confirma.' },
   ],
   messages: {
     greeting: '¡Hola! 👋 Soy {bot}, asesora virtual de EvoSport.',

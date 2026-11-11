@@ -127,6 +127,7 @@ export class QuickAdd implements OnDestroy {
       imageUrl: '', availability: 'tienda', active: true,
       ...(gym && r.maxUserKg ? { maxUserKg: r.maxUserKg } : {}),
       ...(r.variants ? { variants: r.variants, variantName: r.variantName } : {}),
+      ...(r.warranty ? { warranty: r.warranty } : {}),
     };
     const errors = await addMediaToProduct(product, this.files().map((f) => f.file), (m) => this.busy.set(m));
     this.busy.set(null);
