@@ -178,6 +178,46 @@ export interface Kpi {
   target: string;
 }
 
+/** Tipo de toma de una viñeta del guion (cada una tiene su dibujo). */
+export const SHOTS = ['cara', 'producto', 'detalle', 'uso', 'antes_despues', 'texto', 'cliente', 'tienda', 'cta'] as const;
+export type Shot = (typeof SHOTS)[number];
+export const SHOT_LABEL: Record<Shot, string> = {
+  cara: 'Hablando a cámara',
+  producto: 'Producto completo',
+  detalle: 'Primer plano',
+  uso: 'Usándolo',
+  antes_despues: 'Antes y después',
+  texto: 'Texto en pantalla',
+  cliente: 'Cliente o testimonio',
+  tienda: 'En la tienda',
+  cta: 'Llamado a la acción',
+};
+
+/** Viñeta del guion: qué se ve, qué se dice y el texto en pantalla. */
+export interface StoryFrame {
+  shot: Shot;
+  /** "0–3 s" en video, "Lámina 1" en carrusel. */
+  time: string;
+  /** Qué se ve / qué se graba. */
+  visual: string;
+  /** Qué se dice (voz o diálogo). */
+  say: string;
+  /** Texto corto sobre la imagen. */
+  onScreen: string;
+}
+
+/** Paso de la conversación de venta por WhatsApp (guía para los asesores). */
+export interface SalesStep {
+  /** Etapa: apertura, descubrimiento, resumen, recomendación, inversión, objeción, cierre, seguimiento. */
+  stage: string;
+  /** Mensaje del asesor. */
+  say: string;
+  /** Respuesta típica del cliente (opcional). */
+  client: string;
+  /** Consejo corto para el asesor. */
+  tip: string;
+}
+
 export interface ScriptIdea {
   title: string;
   /** Reel, TikTok, historia, carrusel, post… */
@@ -188,6 +228,8 @@ export interface ScriptIdea {
   hook: string;
   /** Escenas o líneas del guion, en orden. */
   scenes: string[];
+  /** Guion en viñetas (los análisis anteriores solo tienen `scenes`). */
+  frames?: StoryFrame[];
   cta: string;
 }
 
@@ -239,6 +281,8 @@ export interface MarketReport {
   insights?: StatsInsight[];
   winners?: Winner[];
   scripts?: ScriptIdea[];
+  /** Guiones: conversación de venta por WhatsApp paso a paso. */
+  salesScript?: SalesStep[];
   leads?: Lead[];
   /** Clientes potenciales que la segunda búsqueda no pudo confirmar (se descartaron). */
   discarded?: number;

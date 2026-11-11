@@ -287,13 +287,35 @@
           }
           <div class="scripts">
             @for (s of scripts(r); track s.title) {
-              <div class="card script">
+              <div class="card script" [class.wide]="s.frames?.length">
                 <div class="row wrap gap-6"><span class="chip">{{ s.format }}</span><span class="chip soft">{{ s.angle }}</span><span class="spacer"></span>
                   <button class="btn ghost icon-only sm no-print" title="Copiar guion" (click)="copy(scriptText(s))"><app-icon name="copy" [size]="14" /></button></div>
                 <b class="title">{{ s.title }}</b>
                 <p class="hook"><small>Gancho (primeros 3 s)</small>{{ s.hook }}</p>
-                <ol>@for (x of s.scenes; track $index) { <li>{{ x }}</li> }</ol>
+                @if (s.frames?.length) {
+                  <app-storyboard [frames]="s.frames!" />
+                } @else {
+                  <ol>@for (x of s.scenes; track $index) { <li>{{ x }}</li> }</ol>
+                }
                 @if (s.cta) { <p class="cta"><app-icon name="send" [size]="13" /> {{ s.cta }}</p> }
+              </div>
+            }
+          </div>
+        }
+
+        @if (t === 'guiones' && r.salesScript?.length) {
+          <h3 class="sec"><app-icon name="send" [size]="16" /> Conversación de venta por WhatsApp
+            <button class="btn ghost icon-only sm no-print" title="Copiar conversación" (click)="copy(salesText(r))"><app-icon name="copy" [size]="14" /></button></h3>
+          <p class="muted sales-intro">Guía para los asesores: un mensaje por vez, escuchar antes de recomendar y pedir una decisión clara.</p>
+          <div class="card sales">
+            @for (st of r.salesScript; track $index) {
+              <div class="sstep">
+                <span class="stage"><b>{{ $index + 1 }}</b> {{ st.stage }}</span>
+                <div class="bubbles">
+                  <div class="msg b-out"><small>Asesor</small>{{ st.say }}</div>
+                  @if (st.client) { <div class="msg b-in"><small>Cliente</small>{{ st.client }}</div> }
+                </div>
+                @if (st.tip) { <p class="advice">💡 {{ st.tip }}</p> }
               </div>
             }
           </div>

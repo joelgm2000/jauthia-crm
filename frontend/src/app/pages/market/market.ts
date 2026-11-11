@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BusinessProfile, EMPTY_PROFILE, Lead, LeadField, Level, MARKET_KIND_LABEL, MarketData, MarketKind, MarketReport, Opportunity, profileMissing, ScriptIdea } from '@shared/market';
+import { BusinessProfile, EMPTY_PROFILE, Lead, LeadField, Level, MARKET_KIND_LABEL, MarketData, MarketKind, MarketReport, Opportunity, profileMissing, ScriptIdea, SHOT_LABEL } from '@shared/market';
+import { Storyboard } from '../../ui/storyboard';
 import { AuthService } from '../../core/auth.service';
 import { CrmStore } from '../../core/data/crm-store';
 import { api } from '../../core/http';
@@ -54,7 +55,7 @@ const HINTS: Record<MarketKind, { placeholder: string; button: string; intro: st
  */
 @Component({
   selector: 'app-market',
-  imports: [FormsModule, Icon, BusinessProfileForm, ScoreRing, MarketStats],
+  imports: [FormsModule, Icon, BusinessProfileForm, ScoreRing, MarketStats, Storyboard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './market.html',
   styleUrl: './market.css',
@@ -178,7 +179,16 @@ export class Market implements OnInit {
   }
 
   scriptText(s: ScriptIdea): string {
-    return [`${s.title} (${s.format} · ${s.angle})`, `Gancho: ${s.hook}`, ...s.scenes.map((x, i) => `${i + 1}. ${x}`), `Cierre: ${s.cta}`].join('\n');
+    const lines = s.frames?.length
+      ? s.frames.map((f, i) => [`${i + 1}. [${f.time ? f.time + ' · ' : ''}${SHOT_LABEL[f.shot]}]`, f.visual && `   Se ve: ${f.visual}`, f.say && `   Se dice: «${f.say}»`, f.onScreen && `   Texto en pantalla: ${f.onScreen}`].filter(Boolean).join('\n'))
+      : s.scenes.map((x, i) => `${i + 1}. ${x}`);
+    return [`${s.title} (${s.format} · ${s.angle})`, `Gancho: ${s.hook}`, ...lines, `Cierre: ${s.cta}`].join('\n');
+  }
+
+  salesText(r: MarketReport): string {
+    return (r.salesScript ?? [])
+      .map((st, i) => [`${i + 1}. ${st.stage}`, `Asesor: ${st.say}`, st.client && `Cliente: ${st.client}`, st.tip && `Consejo: ${st.tip}`].filter(Boolean).join('\n'))
+      .join('\n\n');
   }
 
   /** Enlace de WhatsApp con el mensaje sugerido (solo si hay un número). */

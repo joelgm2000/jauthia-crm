@@ -71,6 +71,24 @@ const ANSWERS = {
     scripts: [
       { title: 'Caminadora en 20 m²', format: 'Reel', angle: 'Objeción', hook: '¿No tienes espacio?', scenes: ['Muestra el apartamento', 'Pliega la caminadora'], cta: 'Escríbenos por WhatsApp' },
       { title: 'Sin gancho', format: 'TikTok', angle: 'x', hook: '', scenes: [] },
+      {
+        title: 'Antes y después en casa', format: 'TikTok', angle: 'Dolor', hook: '¿Pagas gimnasio y no vas?', cta: 'Escribe CASA por WhatsApp',
+        frames: [
+          { shot: 'cara', time: '0–3 s', visual: 'Selfie en la sala', say: '¿Pagas gimnasio y no vas?', onScreen: '¿Pagas y no vas?' },
+          { shot: 'Antes despues', time: '3–10 s', visual: 'Pantalla dividida', say: 'Así se ve un rincón vacío', onScreen: 'Tu rincón' },
+          { shot: 'avion', time: '10–28 s', visual: 'Plano general de la trotadora', say: '', onScreen: '' },
+          { shot: 'cta', time: '37–45 s', visual: 'Celular con WhatsApp', say: 'Escribe CASA', onScreen: 'Escribe CASA' },
+          { shot: 'texto', time: '', visual: '', say: '', onScreen: 'vacía' },
+        ],
+      },
+      {
+        title: 'Todas las tomas', format: 'Carrusel', angle: 'Educativo', hook: 'Las 6 tomas', cta: 'Escribe TOMAS',
+        frames: ['producto', 'detalle', 'uso', 'texto', 'cliente', 'tienda'].map((shot, i) => ({ shot, time: `Lámina ${i + 1}`, visual: `Toma ${shot}`, say: '', onScreen: shot.toUpperCase() })),
+      },
+    ],
+    salesScript: [
+      { stage: 'Apertura', say: 'Hola, [nombre]. Vi que preguntaste por trotadoras. ¿Qué te gustaría resolver primero?', client: 'Quiero hacer ejercicio en casa', tip: 'Una sola pregunta' },
+      { stage: 'Vacío', say: '', client: 'x', tip: 'x' },
     ],
   },
   clientes: {
@@ -196,10 +214,18 @@ check('Recomendaciones de referentes (descarta las que no tienen autor)', rr?.ti
 check('Pilares de contenido suman 100 %', rr?.pillars?.reduce((a, p) => a + p.share, 0) === 100, JSON.stringify(rr?.pillars?.map((p) => p.share)));
 check('Plan de 30 días y metas', rr?.plan?.length === 1 && rr?.kpis?.length === 1);
 check('La instrucción pide referentes sin inventar citas', seen.at(-1).prompt.includes('no inventes citas textuales'));
+check('Redes usa el método de contenido y el de probar productos con anuncios', seen.at(-1).prompt.includes('MÉTODO DE CONTENIDO') && seen.at(-1).prompt.includes('MÉTODO PARA ELEGIR Y PROBAR'));
 
 console.log('\nGuiones y clientes');
 const s1 = await run('adm', 'guiones');
-check('Crea guiones (descarta los que no tienen gancho)', s1.status === 200 && s1.json.report.scripts.length === 1 && s1.json.report.scripts[0].scenes.length === 2, s1.text.slice(0, 200));
+check('Crea guiones (descarta los que no tienen gancho)', s1.status === 200 && s1.json.report.scripts.length === 3 && s1.json.report.scripts[0].scenes.length === 2 && s1.json.report.scripts[2].frames.length === 6, s1.text.slice(0, 200));
+const sb = s1.json?.report?.scripts?.[1];
+check('Guion en viñetas: tomas válidas (desconocida → hablando a cámara) y descarta viñetas vacías', sb?.frames?.length === 4 && sb.frames[1].shot === 'antes_despues' && sb.frames[2].shot === 'cara', JSON.stringify(sb?.frames));
+check('Las viñetas también quedan como escenas', sb?.scenes?.length === 4 && sb.scenes[0] === '¿Pagas gimnasio y no vas?' && sb.scenes[2] === 'Plano general de la trotadora');
+check('Conversación de venta por WhatsApp (descarta pasos vacíos)', s1.json?.report?.salesScript?.length === 1 && s1.json.report.salesScript[0].client.includes('casa'));
+const gp = seen.at(-1).prompt;
+check('La IA sigue el método de contenido y de venta, y pide viñetas', gp.includes('MÉTODO DE CONTENIDO Y GUIONES') && gp.includes('MÉTODO DE VENTA CONSULTIVA') && gp.includes('VIÑETAS') && gp.includes('"salesScript"'));
+check('Nunca menciona de dónde viene el método', gp.includes('NUNCA menciones de dónde viene') && !/A\.M\.I|Herrera|NovaSociety|Dropkiller|Hotmart|S[oó]crates/i.test(gp));
 check('Los guiones parten de las oportunidades frente a la competencia', seen.at(-1).prompt.includes('Instalación incluida'));
 const l1 = await run('adm', 'clientes', 'gimnasios en Valledupar');
 const leads = l1.json?.report?.leads ?? [];
