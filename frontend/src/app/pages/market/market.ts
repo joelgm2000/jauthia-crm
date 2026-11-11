@@ -10,7 +10,7 @@ import { Icon } from '../../ui/icon';
 import { ScoreRing, scoreColor } from '../../ui/score-ring';
 import { MarketStats } from './market-stats';
 
-type Tab = MarketKind | 'perfil';
+type Tab = MarketKind | 'perfil' | 'historial';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'competencia', label: 'Competencia', icon: 'trend' },
@@ -18,6 +18,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'redes', label: 'Redes sociales', icon: 'megaphone' },
   { id: 'guiones', label: 'Guiones', icon: 'play' },
   { id: 'clientes', label: 'Clientes potenciales', icon: 'users' },
+  { id: 'historial', label: 'Historial', icon: 'clock' },
   { id: 'perfil', label: 'Perfil del negocio', icon: 'edit' },
 ];
 
@@ -43,7 +44,7 @@ const HINTS: Record<MarketKind, { placeholder: string; button: string; intro: st
     button: 'Crear guiones',
   },
   clientes: {
-    intro: 'Negocios reales que podrían comprarte, con sus datos públicos y un mensaje para el primer contacto.',
+    intro: 'Negocios reales que podrían comprarte, de dónde los sacamos y un mensaje para el primer contacto. No repite los que ya te sugirió.',
     placeholder: 'Opcional: ej. "gimnasios y hoteles en Valledupar y Riohacha"',
     button: 'Buscar clientes',
   },
@@ -191,11 +192,9 @@ export class Market implements OnInit {
       .join('\n\n');
   }
 
-  /** Enlace de WhatsApp con el mensaje sugerido (solo si hay un número). */
-  waLink(l: Lead): string | null {
-    const digits = (l.phone ?? '').replace(/\D/g, '');
-    if (digits.length < 7) return null;
-    return `https://wa.me/${digits.length === 10 ? '57' + digits : digits}?text=${encodeURIComponent(l.approach)}`;
+  /** Búsqueda del negocio en Google Maps (ahí están sus datos reales y actuales). */
+  mapsLink(l: Lead): string {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([l.name, l.city].filter(Boolean).join(' '))}`;
   }
 
   /** "27 oct, 10:15 a. m." (o con el mes completo). */
@@ -219,8 +218,8 @@ export class Market implements OnInit {
 
   exportLeads(r: MarketReport): void {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const rows = [['Negocio', 'Tipo', 'Ciudad', 'Web', 'Teléfono', 'Instagram', 'Puntaje', 'Por qué', 'Mensaje sugerido']];
-    for (const l of r.leads ?? []) rows.push([l.name, l.type, l.city, l.website ?? '', l.phone ?? '', l.instagram ?? '', String(l.fit), l.why, l.approach]);
+    const rows = [['Negocio', 'Tipo', 'Ciudad', 'Dónde lo encontramos', 'Web', 'Google Maps', 'Puntaje', 'Por qué', 'Mensaje sugerido']];
+    for (const l of r.leads ?? []) rows.push([l.name, l.type, l.city, l.foundIn ?? '', l.website ?? '', this.mapsLink(l), String(l.fit), l.why, l.approach]);
     const blob = new Blob(['﻿' + rows.map((x) => x.map(esc).join(';')).join('\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -301,6 +300,25 @@ export class Market implements OnInit {
   }
 
   isKind(t: Tab): t is MarketKind {
-    return t !== 'perfil';
+    return t !== 'perfil' && t !== 'historial';
+  }
+
+  /** Abre un análisis del historial en su pestaña. */
+  openReport(r: MarketReport): void {
+    this.select(r.kind, r.id);
+    this.tab.set(r.kind);
+    window.scrollTo({ top: 0 });
+  }
+
+  /** "6 oportunidades", "8 guiones"… */
+  countLabel(r: MarketReport): string {
+    const n = (x: number, one: string, many: string) => (x ? `${x} ${x === 1 ? one : many}` : '');
+    switch (r.kind) {
+      case 'competencia': return n(r.opportunities?.length ?? 0, 'oportunidad', 'oportunidades');
+      case 'estadisticas': return n(r.insights?.length ?? 0, 'hallazgo', 'hallazgos');
+      case 'redes': return n(r.tips?.length ?? 0, 'recomendación', 'recomendaciones');
+      case 'guiones': return n(r.scripts?.length ?? 0, 'guion', 'guiones');
+      case 'clientes': return n(r.leads?.length ?? 0, 'negocio', 'negocios');
+    }
   }
 }

@@ -240,8 +240,14 @@ export interface Lead {
   type: string;
   city: string;
   website?: string;
+  /** Solo en análisis anteriores: ya no se piden (la IA suele inventarlos). */
   phone?: string;
+  /** Solo en análisis anteriores: ya no se piden (la IA suele inventarlos). */
   instagram?: string;
+  /** Dónde lo encontró la IA ("Google Maps", "paginasamarillas.com.co"…). */
+  foundIn?: string;
+  /** Página real de la búsqueda donde apareció (de las fuentes que devolvió Google). */
+  sourceUrl?: string;
   /** Por qué podría comprar. */
   why: string;
   /** Mensaje sugerido para el primer contacto. */
@@ -286,6 +292,8 @@ export interface MarketReport {
   leads?: Lead[];
   /** Clientes potenciales que la segunda búsqueda no pudo confirmar (se descartaron). */
   discarded?: number;
+  /** Clientes potenciales que ya se habían sugerido en análisis anteriores (no se repiten). */
+  repeated?: number;
   /** Páginas que consultó la IA. */
   sources: MarketSource[];
 }

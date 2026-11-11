@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { convVars, outsideWindow } from '@shared/automation';
 import { STAGES, stageDef } from '@shared/flow';
+import { api } from '../../core/http';
 import { CITA_KIND_LABEL, CITA_STATUS_LABEL, citaLabel } from '@shared/citas';
 import type { Cita } from '@shared/citas';
 import { templateDrafts } from '@shared/templates';
@@ -89,6 +90,31 @@ export class Inbox {
 
   readonly conv = computed(() => this.store.conversation(this.id()));
 
+  // Sugerencia de respuesta con IA: solo cuando el asesor la pide.
+  readonly suggestion = signal<{ conversationId: string; reply: string; why: string; stage: string; alt: string } | null>(null);
+  readonly suggesting = signal(false);
+
+  async suggest(): Promise<void> {
+    const c = this.conv();
+    if (!c || this.suggesting()) return;
+    this.suggesting.set(true);
+    try {
+      const r = await api<{ reply: string; why: string; stage: string; alt: string }>('/api/assist/reply', { method: 'POST', body: { conversationId: c.id } });
+      // Si el asesor cambió de chat mientras tanto, no se muestra en el otro.
+      if (this.conv()?.id === c.id) this.suggestion.set({ conversationId: c.id, ...r });
+    } catch (e) {
+      this.store.toast((e as Error).message, 'error');
+    } finally {
+      this.suggesting.set(false);
+    }
+  }
+
+  useSuggestion(text: string): void {
+    this.draft.set(text);
+    this.suggestion.set(null);
+    queueMicrotask(() => this.box()?.nativeElement.focus());
+  }
+
   readonly list = computed(() => {
     const q = this.search().toLowerCase().trim();
     const f = this.filter();
@@ -152,6 +178,13 @@ export class Inbox {
     });
     effect(() => {
       if (this.typing()) queueMicrotask(() => this.scrollBottom());
+    });
+    // La sugerencia es de un chat: al cambiar de conversación se quita.
+    effect(() => {
+      const id = this.id();
+      untracked(() => {
+        if (this.suggestion() && this.suggestion()!.conversationId !== id) this.suggestion.set(null);
+      });
     });
     // Abre la primera conversación en pantallas anchas.
     effect(() => {

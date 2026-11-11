@@ -325,7 +325,7 @@
         @if (t === 'clientes') {
           @if (r.leads?.[0]?.verified !== undefined) {
             <p class="verify"><app-icon name="checks" [size]="15" />
-              <span><b>Revisados dos veces.</b> Una segunda búsqueda independiente confirmó {{ r.leads!.length }} negocio(s){{ r.discarded ? ' y descartó ' + r.discarded + ' que no pudo encontrar' : '' }}. ✓ = dato encontrado en las dos búsquedas.</span></p>
+              <span><b>Revisados dos veces.</b> Una segunda búsqueda independiente confirmó {{ r.leads!.length }} negocio(s){{ r.discarded ? ' y descartó ' + r.discarded + ' que no pudo encontrar' : '' }}{{ r.repeated ? '. No se repiten ' + r.repeated + ' que ya te había sugerido' : '' }}.</span></p>
           }
           <div class="row wrap export no-print">
             <div class="seg">
@@ -355,17 +355,19 @@
                   <small>Mensaje sugerido</small>
                   <p>{{ l.approach }}</p>
                 </div>
+                @if (l.foundIn) {
+                  <small class="found"><app-icon name="search" [size]="12" /> Lo encontramos en:
+                    @if (l.sourceUrl) { <a [href]="l.sourceUrl" target="_blank" rel="noopener noreferrer nofollow">{{ l.foundIn }}</a> } @else { {{ l.foundIn }} }</small>
+                }
                 <div class="row wrap gap-6">
                   <button class="btn sm no-print" (click)="copy(l.approach)"><app-icon name="copy" [size]="13" /> Copiar mensaje</button>
-                  @if (waLink(l); as wa) { <a class="btn sm no-print" [href]="wa" target="_blank" rel="noopener noreferrer"><app-icon name="phone" [size]="13" /> WhatsApp</a> }
-                  @if (l.instagram) { <a class="btn sm" [href]="l.instagram" target="_blank" rel="noopener noreferrer nofollow" [title]="checkTitle(l, 'instagram')"><app-icon name="external" [size]="13" /> Instagram {{ checkMark(l, 'instagram') }}</a> }
+                  <a class="btn sm" [href]="mapsLink(l)" target="_blank" rel="noopener noreferrer"><app-icon name="map" [size]="13" /> Buscar en Google Maps</a>
                   @if (l.website) { <a class="btn sm" [href]="l.website" target="_blank" rel="noopener noreferrer nofollow" [title]="checkTitle(l, 'website')"><app-icon name="external" [size]="13" /> Web {{ checkMark(l, 'website') }}</a> }
-                  @if (l.phone) { <span class="phone" [class.muted]="l.checks?.phone !== 'ok'" [title]="checkTitle(l, 'phone')">{{ l.phone }} {{ checkMark(l, 'phone') }}</span> }
                 </div>
               </div>
             } @empty { <p class="muted">Ningún prospecto con ese filtro.</p> }
           </div>
-          <p class="muted note">Son datos públicos de empresas encontrados en internet y revisados dos veces. "Sin confirmar" (⚠) = solo lo encontró una de las dos búsquedas. Respeta a quien no quiera recibir mensajes.</p>
+          <p class="muted note">Son empresas reales encontradas en internet y revisadas dos veces. No mostramos teléfonos, correos ni redes porque casi nunca se pueden confirmar: búscalas en Google Maps para ver sus datos actuales. Respeta a quien no quiera recibir mensajes.</p>
         }
 
         @if (r.sources.length) {
@@ -381,6 +383,24 @@
           <p>Aún no hay análisis de este tipo. @if (auth.isAdmin()) { Toca <b>{{ hints[t].button }}</b> para empezar. }</p>
         </div>
       }
+    } @else if (t === 'historial') {
+      <!-- ============ Historial de todo lo que se ha hecho ============ -->
+      <p class="muted hist-intro">Todo lo que se ha analizado, del más reciente al más antiguo. La IA tiene en cuenta los últimos análisis de cada tipo para no sugerirte lo mismo otra vez (y en clientes potenciales no repite negocios).</p>
+      <div class="card hist">
+        @for (h of reports(); track h.id) {
+          <button class="hist-row" (click)="openReport(h)">
+            <span class="chip">{{ kindLabel[h.kind] }}</span>
+            <div class="hm">
+              <b>{{ when(h.createdAt, true) }}</b><small class="muted">por {{ h.by }}@if (h.request) { · «{{ h.request }}» }</small>
+              <small class="sum">{{ h.summary }}</small>
+            </div>
+            <small class="count">{{ countLabel(h) }}</small>
+            <app-icon name="external" [size]="14" />
+          </button>
+        } @empty {
+          <div class="empty">Aún no hay análisis.</div>
+        }
+      </div>
     } @else {
       <!-- ============ Perfil del negocio ============ -->
       <section class="card card-pad">

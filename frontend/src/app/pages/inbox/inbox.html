@@ -140,8 +140,22 @@
           @if (mode() === 'reply') {
             <button class="tool" (click)="showProducts.set(true)"><app-icon name="box" [size]="14" /> Productos</button>
             <button class="tool" (click)="showTemplates.set(true)"><app-icon name="template" [size]="14" /> Plantillas</button>
+            <button class="tool" (click)="suggest()" [disabled]="suggesting()" title="La IA lee el chat y te propone qué contestar. Tú decides si lo usas."><app-icon name="sparkles" [size]="14" /> {{ suggesting() ? 'Pensando…' : 'Sugerir respuesta' }}</button>
           }
         </div>
+        @if (mode() === 'reply' && suggestion(); as sg) {
+          <div class="suggest">
+            <div class="sg-head"><app-icon name="sparkles" [size]="13" /> <b>Te sugiero contestar</b>@if (sg.stage) { <span class="chip">{{ sg.stage }}</span> }<span class="spacer"></span>
+              <button class="btn ghost icon-only sm" title="Cerrar" (click)="suggestion.set(null)"><app-icon name="x" [size]="13" /></button></div>
+            <p class="sg-text">{{ sg.reply }}</p>
+            @if (sg.why) { <small class="muted">{{ sg.why }}</small> }
+            @if (sg.alt) { <details><summary>Otra opción</summary><p class="sg-text">{{ sg.alt }}</p><button class="btn sm" (click)="useSuggestion(sg.alt)">Usar esta</button></details> }
+            <div class="row wrap gap-6">
+              <button class="btn sm primary" (click)="useSuggestion(sg.reply)"><app-icon name="edit" [size]="13" /> Usar (puedes editarla)</button>
+              <button class="btn sm" (click)="suggest()" [disabled]="suggesting()"><app-icon name="refresh" [size]="13" /> Otra sugerencia</button>
+            </div>
+          </div>
+        }
         <div class="input-row">
           <textarea #box rows="1" [placeholder]="mode() === 'note' ? 'Nota visible solo para el equipo…' : mode() === 'simulate' ? 'Escribe como el cliente (ej: ¿tienen caminadoras?) o toca los botones del chat…' : 'Escribe una respuesta… (Enter para enviar)'"
             [ngModel]="draft()" (ngModelChange)="draft.set($event)" (keydown)="onKey($event)"></textarea>
