@@ -13,6 +13,8 @@
     "create-admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.11.0",
+    "@tesseract.js-data/spa": "^1.0.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -20,9 +22,12 @@
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
+    "jimp": "^1.6.1",
     "jsonwebtoken": "^9.0.3",
+    "pdfjs-dist": "^6.5.438",
     "pg": "^8.23.1",
     "socket.io": "^4.8.4",
+    "tesseract.js": "^7.0.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

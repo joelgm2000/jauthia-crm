@@ -1,8 +1,7 @@
-// Capturas del formulario de alta y del panel (después de: node onboarding.mjs). Gemini falsa propia en 3199.
+// Capturas del formulario de alta y del panel (después de: sh restart.sh && node onboarding.mjs). El RUT se lee gratis en el servidor.
 import puppeteer from 'puppeteer-core';
-import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { rutPdf } from './rut-pdf.mjs';
 
 const B = 'http://localhost:3100';
 const dir = new URL('./results/shots/', import.meta.url);
@@ -10,11 +9,7 @@ mkdirSync(dir, { recursive: true });
 const file = (n) => decodeURIComponent(new URL(n + '.jpg', dir).pathname.slice(1));
 const qa = JSON.parse(readFileSync(new URL('./.qa-alta.json', import.meta.url), 'utf8'));
 const pdfPath = decodeURIComponent(new URL('./results/rut-prueba.pdf', import.meta.url).pathname.slice(1));
-writeFileSync(pdfPath, Buffer.concat([Buffer.from('%PDF-1.4\n'), randomBytes(1500)]));
-
-const RUT = { esDocumentoDelNegocio: true, esRut: true, tipo: 'natural', nombre: 'JAVIER ENRIQUE MENDEZ ALCOCER', nombreComercial: 'EVOSPORT', nit: '1001994201', dv: '3', direccion: 'CR 9 9B 15 LC 1', ciudad: 'Valledupar', departamento: 'Cesar', telefono: '3003948190', correo: 'ing.javier19@gmail.com', actividad: '4762', representante: '' };
-const mock = createServer((rq, rs) => { rq.resume(); rq.on('end', () => rs.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(RUT) }] } }] }))); });
-await new Promise((r) => mock.listen(3199, r));
+writeFileSync(pdfPath, await rutPdf());
 
 let bad = 0;
 const ok = (name, cond) => { console.log(`  ${cond ? '✔' : '✘'} ${name}`); if (!cond) bad++; };
@@ -90,5 +85,4 @@ await settle(1000);
 ok('Panel sin desborde en celular', await noOverflow());
 
 await browser.close();
-mock.close();
 process.exit(bad ? 1 : 0);

@@ -92,7 +92,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
                 } @else {
                   <app-icon name="image" [size]="22" />
                   <b>{{ form.hasRut ? 'Sube tu RUT' : 'Sube el documento' }}</b>
-                  <small>Foto o PDF · máximo {{ maxMb }} MB</small>
+                  <small>{{ form.hasRut ? 'Mejor el PDF que descargas de la DIAN; si no, una foto de frente y con buena luz' : 'Foto o PDF' }} · máximo {{ maxMb }} MB</small>
                 }
               </label>
               @if (notice()) { <small class="warn">{{ notice() }}</small> }
@@ -173,7 +173,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
         <section class="card step final">
           <label class="consent"><input type="checkbox" [(ngModel)]="form.consent" />
-            <span>Autorizo a JAUTHIA a usar estos datos y el documento solo para configurar y verificar los canales de mi negocio con Meta. Se guardan cifrados y no se comparten con nadie más.</span>
+            <span>Autorizo a JAUTHIA a usar estos datos y el documento solo para configurar y verificar los canales de mi negocio con Meta. Se guardan cifrados{{ info()?.ocrEngine === 'claude' ? '. Para leer el documento usamos la inteligencia artificial Claude (de Anthropic); no se comparte con nadie más.' : ', el documento se lee en nuestro propio servidor y no se comparte con nadie.' }}</span>
           </label>
           @if (error()) { <small class="err">{{ error() }}</small> }
           <button class="btn primary big" type="button" [disabled]="sending() || uploading()" (click)="submit()">

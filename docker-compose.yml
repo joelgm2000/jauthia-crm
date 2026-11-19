@@ -37,6 +37,7 @@ services:
       MEDIA_DIR: /app/media
       MEDIA_QUOTA_MB: ${MEDIA_QUOTA_MB:-1024}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_IMAGE_MODEL: ${AI_IMAGE_MODEL:-gemini-2.5-flash-image}
       # Inteligencia de mercado (investiga con búsqueda de Google).
       AI_TEXT_MODEL: ${AI_TEXT_MODEL:-gemini-2.5-flash}

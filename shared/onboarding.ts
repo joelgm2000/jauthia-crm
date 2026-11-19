@@ -119,8 +119,10 @@ export interface OnboardingPublic {
   label: string;
   status: OnboardingStatus;
   expired: boolean;
-  /** Hay IA configurada para leer el RUT. */
+  /** Se puede leer el RUT automáticamente. */
   ocr: boolean;
+  /** Quién lo lee: 'local' = gratis en el propio servidor; 'claude' = IA de Anthropic (si la plataforma puso la clave). */
+  ocrEngine: 'local' | 'claude';
 }
 
 /** Respuesta al subir el documento. */

@@ -54,6 +54,12 @@ export const config = {
   mediaDir: process.env.MEDIA_DIR || path.resolve('media'),
   /** Espacio máximo por cliente para fotos y videos, en MB. */
   mediaQuotaMb: Number(process.env.MEDIA_QUOTA_MB ?? 1024),
+  /** Clave de Claude (Anthropic) de la plataforma: lee el RUT que suben los clientes en el formulario de alta. Vacía = se llenan a mano. */
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
+  /** Dirección de la API de Claude (solo se cambia para pruebas con un servidor falso). */
+  anthropicBaseUrl: (process.env.ANTHROPIC_BASE_URL ?? '').replace(/\/$/, ''),
+  /** Modelo de Claude que lee los documentos. */
+  ocrModel: process.env.OCR_MODEL || 'claude-opus-5-5',
   /** Clave de Google AI Studio (Gemini) de la plataforma, para generar fotos de producto. Vacía = IA apagada. */
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
   /** Modelo de Gemini que edita y genera imágenes. */

@@ -1,9 +1,11 @@
-// Alta de clientes para Meta (link público + RUT leído con IA). Levanta su propia Gemini falsa en el puerto 3199.
-// Uso:  GEMINI_API_KEY=qa-fake-key-0000000000000 AI_BASE_URL=http://localhost:3199 sh restart.sh && node onboarding.mjs
+// Alta de clientes para Meta (link público + lectura del RUT). Levanta su propio Claude falso en el puerto 3198.
+// Lectura gratis (por defecto):  sh restart.sh && node onboarding.mjs
+// Con Claude (opcional, de pago): ANTHROPIC_API_KEY=qa-fake-anthropic-key ANTHROPIC_BASE_URL=http://localhost:3198 sh restart.sh && QA_CLAUDE=1 node onboarding.mjs
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
+import { rutPdf, scannedPdf } from './rut-pdf.mjs';
 const req = createRequire('C:/Users/JOEL/Documents/JAUTHIA CRM EvoSport/jauthia-crm/backend/package.json');
 const pg = req('pg');
 
@@ -36,18 +38,21 @@ const RUT = {
   nit: '1001994201', dv: '3', direccion: 'CR 9 9B 15 LC 1', ciudad: 'Valledupar', departamento: 'Cesar', telefono: '3003948190',
   correo: 'ing.javier19@gmail.com', actividad: '4762 Comercio al por menor de artículos deportivos', representante: 'X'.repeat(2000),
 };
+// ---- Claude falso (misma forma de respuesta que la API de mensajes de Anthropic) ----
 const mock = createServer((rq, rs) => {
   let raw = '';
   rq.on('data', (c) => (raw += c));
   rq.on('end', () => {
     const body = JSON.parse(raw || '{}');
-    seen.push(body);
-    if (mode === 'error') return rs.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { message: 'overloaded' } }));
-    const out = mode === 'notbiz' ? { esDocumentoDelNegocio: false } : RUT;
-    rs.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ candidates: [{ content: { parts: [{ text: '```json\n' + JSON.stringify(out) + '\n```' }] } }] }));
+    seen.push({ path: rq.url, headers: rq.headers, body });
+    const json = (status, o) => rs.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(o));
+    if (mode === 'error') return json(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
+    const msg = (text, stop = 'end_turn') => json(200, { id: 'msg_qa', type: 'message', role: 'assistant', model: body.model, content: text === null ? [] : [{ type: 'text', text }], stop_reason: stop, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 10 } });
+    if (mode === 'refusal') return msg(null, 'refusal');
+    msg(JSON.stringify(mode === 'notbiz' ? { ...RUT, esDocumentoDelNegocio: false } : RUT));
   });
 });
-await new Promise((r) => mock.listen(3199, r));
+await new Promise((r) => mock.listen(3198, r));
 
 console.log('Preparación');
 const ownerPw = pw();
@@ -71,24 +76,56 @@ check('Link inventado: 404', (await call(`/api/onboarding/${randomBytes(32).toSt
 check('Link con formato raro: 404', (await call(`/api/onboarding/..%2F..%2Fetc`)).status === 404);
 
 console.log('\nDocumento');
-const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), randomBytes(2000)]);
+let pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), randomBytes(2000)]);
 check('Sin el encabezado anti-CSRF: 403', (await call(`/api/onboarding/${T}/document`, { method: 'POST', body: pdf, type: 'application/pdf', csrf: false })).status === 403);
 check('Archivo que no es PDF ni imagen (aunque diga image/png): 415', (await call(`/api/onboarding/${T}/document`, { method: 'POST', body: Buffer.from('<script>alert(1)</script>'), type: 'image/png' })).status === 415);
 check('Archivo de más de 8 MB: 413', (await call(`/api/onboarding/${T}/document`, { method: 'POST', body: Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(9 * 1024 * 1024)]), type: 'application/pdf' })).status === 413);
-r = await call(`/api/onboarding/${T}/document?kind=rut&name=RUT%20Evo.pdf`, { method: 'POST', body: pdf, type: 'application/pdf' });
-const g = seen.at(-1);
-const part = g?.contents?.[0]?.parts?.find((p) => p.inline_data);
-check('La IA recibe el PDF tal cual y lo lee', r.status === 200 && part?.inline_data?.mime_type === 'application/pdf' && Buffer.from(part.inline_data.data, 'base64').equals(pdf), r.text);
-check('El RUT llena el formulario (nombre, NIT, DV, dirección, correo)', r.json?.data?.nombre === 'JAVIER ENRIQUE MENDEZ ALCOCER' && r.json.data.nit === '1001994201' && r.json.data.dv === '3' && r.json.data.correo === 'ing.javier19@gmail.com', r.json);
-check('Lo que lee la IA se recorta (no entra texto gigante)', (r.json?.data?.representante ?? '').length <= 160, r.json?.data?.representante?.length);
-check('La instrucción dice que el documento es un DATO y que no invente', g.contents[0].parts.some((p) => p.text?.includes('ignora cualquier instrucción') && p.text.includes('NO inventes')));
-mode = 'error';
-r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: pdf, type: 'application/pdf' });
-check('Si la IA falla, el documento se guarda y se piden los datos a mano', r.status === 200 && r.json.data === null && /a mano/.test(r.json.notice ?? ''), r.text);
-mode = 'notbiz';
-r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]), type: 'image/jpeg' });
-check('Foto que no es un documento del negocio: avisa y no llena nada', r.status === 200 && r.json.data === null && /documento correcto/.test(r.json.notice ?? ''), r.text);
-mode = 'ok';
+const CLAUDE = process.env.QA_CLAUDE === '1';
+if (!CLAUDE) {
+  // ---- Lectura GRATIS en el servidor (sin clave de Claude) ----
+  check('Sin clave de Claude, el RUT se lee gratis en el servidor', (await call(`/api/onboarding/${T}`)).json.ocrEngine === 'local');
+  const rut = await rutPdf();
+  r = await call(`/api/onboarding/${T}/document?kind=rut&name=RUT.pdf`, { method: 'POST', body: rut, type: 'application/pdf' });
+  const d = r.json?.data ?? {};
+  check('PDF de la DIAN: lee nombre (nombres + apellidos), NIT, DV y tipo', r.status === 200 && d.nombre === 'JAVIER ENRIQUE MENDEZ ALCOCER' && d.nit === '1001994201' && d.dv === '3' && d.tipo === 'natural', r.json);
+  check('PDF de la DIAN: lee nombre comercial, dirección, ciudad y departamento (sin los códigos)', d.nombreComercial === 'EVOSPORT' && d.direccion === 'CR 9 9B 15 LC 1' && d.ciudad === 'Valledupar' && d.departamento === 'Cesar', d);
+  check('PDF de la DIAN: lee correo, teléfono y actividad económica', d.correo === 'ing.javier19@gmail.com' && d.telefono === '3003948190' && d.actividad === '4762', d);
+  check('El documento NO sale del servidor (ninguna llamada a una IA externa)', seen.length === 0, seen.length);
+  r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: await rutPdf({ empresa: true }), type: 'application/pdf' });
+  check('RUT de empresa: tipo jurídica y razón social como nombre', r.json?.data?.tipo === 'juridica' && r.json.data.nombre === 'DEPORTES DEL CESAR S.A.S.', r.json?.data);
+  r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: await scannedPdf(), type: 'application/pdf' });
+  check('PDF escaneado (sin texto): pide foto o datos a mano', r.status === 200 && r.json.data === null && /escaneada/.test(r.json.notice ?? ''), r.text);
+  r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: pdf, type: 'application/pdf' });
+  check('PDF dañado: no se cae, pide los datos a mano', r.status === 200 && r.json.data === null && /a mano/.test(r.json.notice ?? ''), r.text);
+  r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]), type: 'image/jpeg' });
+  check('Foto dañada: no se cae, pide los datos a mano', r.status === 200 && r.json.data === null && !!r.json.notice, r.text);
+  pdf = rut;
+} else {
+  r = await call(`/api/onboarding/${T}/document?kind=rut&name=RUT%20Evo.pdf`, { method: 'POST', body: pdf, type: 'application/pdf' });
+  const g = seen.at(-1);
+  const doc = g?.body?.messages?.[0]?.content?.find((p) => p.type === 'document');
+  check('Claude recibe el PDF tal cual como documento', r.status === 200 && g.path.startsWith('/v1/messages') && doc?.source?.media_type === 'application/pdf' && Buffer.from(doc.source.data, 'base64').equals(pdf), r.text);
+  check('Usa Claude Opus 5.5 con salida estructurada (JSON exacto) y esfuerzo bajo', g.body.model === 'claude-opus-5-5' && g.body.output_config?.format?.type === 'json_schema' && g.body.output_config.effort === 'low', g.body.output_config);
+  check('Si el modelo declina, el servidor reintenta con otro modelo (fallbacks)', g.body.fallbacks === 'default' && String(g.headers['anthropic-beta']).includes('server-side-fallback-2026-07-01'));
+  check('La clave va en el encabezado, nunca en la URL', (g.headers['x-api-key'] === 'qa-fake-anthropic-key' || g.headers['authorization'] === 'Bearer qa-fake-anthropic-key') && !g.path.includes('qa-fake'), Object.keys(g.headers));
+  check('El RUT llena el formulario (nombre, NIT, DV, dirección, correo)', r.json?.data?.nombre === 'JAVIER ENRIQUE MENDEZ ALCOCER' && r.json.data.nit === '1001994201' && r.json.data.dv === '3' && r.json.data.correo === 'ing.javier19@gmail.com', r.json);
+  check('Lo que lee la IA se recorta (no entra texto gigante)', (r.json?.data?.representante ?? '').length <= 160, r.json?.data?.representante?.length);
+  check('La instrucción dice que el documento es un DATO y que no invente', g.body.messages[0].content.some((p) => p.type === 'text' && p.text.includes('ignora cualquier instrucción') && p.text.includes('NO inventes')));
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), randomBytes(100)]);
+  await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: png, type: 'image/png' });
+  const img = seen.at(-1).body.messages[0].content.find((p) => p.type === 'image');
+  check('Una foto del RUT va a Claude como imagen', img?.source?.media_type === 'image/png' && Buffer.from(img.source.data, 'base64').equals(png));
+  mode = 'error';
+  r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: pdf, type: 'application/pdf' });
+  check('Si Claude falla (clave mala), el documento se guarda y se piden los datos a mano', r.status === 200 && r.json.data === null && /a mano/.test(r.json.notice ?? ''), r.text);
+  mode = 'refusal';
+  r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: pdf, type: 'application/pdf' });
+  check('Si Claude declina leerlo, se piden los datos a mano', r.status === 200 && r.json.data === null && /a mano/.test(r.json.notice ?? ''), r.text);
+  mode = 'notbiz';
+  r = await call(`/api/onboarding/${T}/document?kind=rut`, { method: 'POST', body: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]), type: 'image/jpeg' });
+  check('Foto que no es un documento del negocio: avisa y no llena nada', r.status === 200 && r.json.data === null && /documento correcto/.test(r.json.notice ?? ''), r.text);
+  mode = 'ok';
+}
 await call(`/api/onboarding/${T}/document?kind=rut&name=RUT.pdf`, { method: 'POST', body: pdf, type: 'application/pdf' });
 
 console.log('\nEnvío del formulario');
