@@ -4,6 +4,8 @@ import { Shell } from './layout/shell';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
+  // Formulario público de alta (el cliente lo abre con el link que le enviamos; no necesita cuenta).
+  { path: 'alta/:token', loadComponent: () => import('./pages/onboarding/onboarding').then((m) => m.Onboarding) },
   { path: 'super', canActivate: [superGuard], loadComponent: () => import('./pages/super/super-panel').then((m) => m.SuperPanel) },
   {
     path: '',

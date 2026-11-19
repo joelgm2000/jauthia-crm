@@ -18,6 +18,8 @@ import { log } from './log';
 import { businessProfile, emailSchema, passwordSchema, short, tenantRole } from './schemas';
 import { getAiKey, getSocialKeys, setAiKey, setSocialKeys } from './secrets';
 import { seedTenant } from './tenants';
+import { createOnboarding, deleteOnboarding, getOnboardingDoc, listOnboardings, setOnboardingStatus } from './onboarding';
+import { ONBOARDING_STATUSES } from '../../shared/onboarding';
 
 const tenantId = z.string().min(3).max(60).regex(/^[a-z0-9-]+$/, 'Solo minúsculas, números y guiones');
 
@@ -57,6 +59,11 @@ const schemas: Record<SuperAction, z.ZodType> = {
   listSuperadmins: z.object({}),
   createSuperadmin: z.object({ name: short(80).min(2), email: emailSchema, password: passwordSchema }),
   removeSuperadmin: z.object({ id: z.string().max(120) }),
+  createOnboarding: z.object({ label: short(120).trim().min(2, 'Escribe el nombre del cliente'), tenantId: z.union([tenantId, z.literal('')]).optional() }),
+  listOnboardings: z.object({}),
+  getOnboardingDoc: z.object({ id: z.string().regex(/^alta-[a-f0-9]{12}$/) }),
+  setOnboardingStatus: z.object({ id: z.string().regex(/^alta-[a-f0-9]{12}$/), status: z.enum(ONBOARDING_STATUSES) }),
+  deleteOnboarding: z.object({ id: z.string().regex(/^alta-[a-f0-9]{12}$/) }),
 };
 
 /** Id del cliente: nombre legible + sufijo al azar ("evosport-4rps"). */
@@ -153,6 +160,27 @@ const handlers: { [A in SuperAction]: Handler<A> } = {
     const r = await pool.query(`DELETE FROM users WHERE id = $1 AND role = 'superadmin' RETURNING email`, [d.id]);
     if (!r.rowCount) throw new ApiError(404, 'No existe ese super administrador');
     log.warn('Super administrador eliminado', { id: d.id, by: me.id });
+    return null;
+  },
+
+  createOnboarding: async (d, { me }) => {
+    if (d.tenantId && !(await getTenant(d.tenantId))) throw new ApiError(404, 'El cliente no existe');
+    const onboarding = await createOnboarding(d.label, d.tenantId || undefined);
+    log.info('Link de alta creado', { id: onboarding.id, by: me.id });
+    return { onboarding };
+  },
+  listOnboardings: async () => ({ onboardings: await listOnboardings() }),
+  getOnboardingDoc: async (d, { me }) => {
+    log.info('Documento de alta descargado', { id: d.id, by: me.id });
+    return getOnboardingDoc(d.id);
+  },
+  setOnboardingStatus: async (d) => {
+    await setOnboardingStatus(d.id, d.status);
+    return null;
+  },
+  deleteOnboarding: async (d, { me }) => {
+    await deleteOnboarding(d.id);
+    log.warn('Alta de cliente eliminada', { id: d.id, by: me.id });
     return null;
   },
 };

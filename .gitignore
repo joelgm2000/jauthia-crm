@@ -60,6 +60,7 @@ qa/pgtest/
 qa/results/
 qa/.qa-owner
 qa/.qa-demo.json
+qa/.qa-alta.json
 *.log
 *.zip
 *.tgz

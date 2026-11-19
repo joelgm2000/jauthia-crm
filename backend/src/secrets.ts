@@ -24,14 +24,16 @@ export type ChannelSecrets = Record<string, string>;
 /** Fila de channel_secrets: un canal, 'ai' (clave de Gemini) o 'social' (token de Meta y clave de YouTube para las estadísticas). */
 type SecretScope = ChannelType | 'ai' | 'social';
 
-function encrypt(plain: string): string {
+/** Cifra un texto con SECRETS_KEY (AES-256-GCM). */
+export function encrypt(plain: string): string {
   const iv = randomBytes(12);
   const c = createCipheriv('aes-256-gcm', config.secretsKey, iv);
   const enc = Buffer.concat([c.update(plain, 'utf8'), c.final()]);
   return ['v1', iv.toString('base64'), c.getAuthTag().toString('base64'), enc.toString('base64')].join(':');
 }
 
-function decrypt(blob: string): string {
+/** Descifra lo que produjo encrypt(); lanza si la clave cambió o el dato está dañado. */
+export function decrypt(blob: string): string {
   const [v, iv, tag, data] = blob.split(':');
   if (v !== 'v1') throw new Error('Formato de secreto desconocido');
   const d = createDecipheriv('aes-256-gcm', config.secretsKey, Buffer.from(iv, 'base64'));

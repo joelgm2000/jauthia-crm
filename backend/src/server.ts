@@ -26,6 +26,7 @@ import { log } from './log';
 import { serveMedia } from './media';
 import { startRealtime } from './realtime';
 import { superRouter } from './super';
+import { onboardingRouter } from './onboarding';
 import { webhooksRouter } from './webhooks';
 
 async function main(): Promise<void> {
@@ -63,6 +64,8 @@ async function main(): Promise<void> {
   const appCors = cors({ origin: config.corsOrigins, credentials: true });
   app.use((req, res, next) => (/^\/webhooks\/[^/]+\/webchat/.test(req.path) ? next() : appCors(req, res, next)));
   app.use(cookieParser());
+  // Alta de clientes (link público): va antes del lector JSON general porque recibe el RUT (hasta 8 MB).
+  app.use('/api/onboarding', onboardingRouter);
   // Guardamos el cuerpo original para validar las firmas de Meta.
   app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => ((req as Request).rawBody = buf) }));
 

@@ -90,6 +90,18 @@ CREATE TABLE IF NOT EXISTS channel_secrets (
   updated_at BIGINT NOT NULL,
   PRIMARY KEY (tenant_id, channel)
 );
+
+-- Alta de clientes (link para que el cliente suba su RUT y sus datos de Meta). Todo CIFRADO;
+-- el link se guarda como hash (sha256) para buscarlo, y cifrado dentro de data_enc para volver a mostrarlo.
+CREATE TABLE IF NOT EXISTS onboardings (
+  id         TEXT PRIMARY KEY,
+  token_hash TEXT NOT NULL UNIQUE,
+  status     TEXT NOT NULL DEFAULT 'pendiente',
+  data_enc   TEXT NOT NULL,
+  doc_enc    TEXT,
+  created_at BIGINT NOT NULL,
+  expires_at BIGINT NOT NULL
+);
 `;
 
 export async function migrate(): Promise<void> {

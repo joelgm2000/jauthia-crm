@@ -16,6 +16,7 @@ node conversations.mjs        # 12 conversaciones del bot      → results/conve
 node shots.mjs tenant         # capturas del CRM               → results/shots/
 node automation.mjs           # remarketing y alertas de compra → results/automation.json
 sh restart.sh && node conversations.mjs && node citas.mjs   # citas, garantía y gimnasio → asesor (con capturas)
+GEMINI_API_KEY=qa-fake-key-0000000000000 AI_BASE_URL=http://localhost:3199 sh restart.sh && node onboarding.mjs && node onboarding-shot.mjs   # alta de clientes (link + RUT con IA)
 node shots.mjs auto           # capturas de esos chats y de la pantalla de remarketing
 node load.mjs 50,200,500,1000,2000   # masividad               → results/load.json
 node shots.mjs super          # captura del panel de la plataforma

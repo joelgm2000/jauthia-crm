@@ -5,6 +5,7 @@
  * El frontend NUNCA escribe en la base de datos: toda escritura pasa por estas acciones,
  * que el backend valida (esquema + rol + cliente del usuario) antes de aplicarlas.
  */
+import { OnboardingStatus, OnboardingSummary } from './onboarding';
 import { ConversationEdit } from './actions';
 import { FlowConfig } from './flow';
 import { OutgoingDraft } from './products';
@@ -127,6 +128,12 @@ export interface SuperActions {
   createSuperadmin: { req: { name: string; email: string; password: string }; res: { user: CrmUserInfo } };
   /** Solo el dueño de la plataforma. */
   removeSuperadmin: { req: { id: string }; res: void };
+  /** Alta de clientes para Meta: link para que el cliente suba su RUT y sus datos. */
+  createOnboarding: { req: { label: string; tenantId?: string }; res: { onboarding: OnboardingSummary } };
+  listOnboardings: { req: Record<string, never>; res: { onboardings: OnboardingSummary[] } };
+  getOnboardingDoc: { req: { id: string }; res: { name: string; mime: string; base64: string } };
+  setOnboardingStatus: { req: { id: string; status: OnboardingStatus }; res: void };
+  deleteOnboarding: { req: { id: string }; res: void };
 }
 
 export type SuperAction = keyof SuperActions;

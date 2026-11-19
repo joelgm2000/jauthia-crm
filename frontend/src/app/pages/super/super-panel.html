@@ -68,6 +68,41 @@
     </table>
   </div>
 
+  <section class="card altas">
+    <div class="card-head"><app-icon name="plug" [size]="16" /><h2>Altas de clientes para Meta</h2>
+      @if (newAltas()) { <span class="badge warn">{{ newAltas() }} nueva(s)</span> }
+      <span class="spacer"></span><small class="muted">Crea un link, envíaselo al cliente y aquí te llegan su RUT y sus datos.</small></div>
+    <div class="card-pad col">
+      <div class="row wrap add first">
+        <input class="input" placeholder="Nombre del cliente (ej. Gimnasio Titanes)" [(ngModel)]="altaLabel" />
+        <select class="select" [(ngModel)]="altaTenant" title="Si ya lo creaste como cliente, elígelo">
+          <option value="">Cliente nuevo (aún no está en la plataforma)</option>
+          @for (t of tenants(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
+        </select>
+        <button class="btn primary" [disabled]="altaLabel.trim().length < 2" (click)="createAlta()"><app-icon name="plus" [size]="13" /> Crear link y copiarlo</button>
+      </div>
+      @for (a of altas(); track a.id) {
+        <div class="row alta">
+          <div class="who-alta">
+            <b>{{ a.label }}</b>
+            <small class="muted">Creado hace {{ a.createdAt | ago }}@if (a.submittedAt) { · enviado hace {{ a.submittedAt | ago }} }@if (a.doc) { · {{ docKindLabel[a.doc.kind] }} }</small>
+          </div>
+          <span class="badge" [class.warn]="a.status === 'enviado'" [class.ok]="a.status === 'revisado'" [class.gray]="a.status === 'pendiente'">{{ altaStatusLabel[a.status] }}</span>
+          <span class="spacer"></span>
+          @if (a.status === 'pendiente') {
+            <button class="btn sm" (click)="copyAlta(a)" title="Copiar link"><app-icon name="copy" [size]="13" /> Copiar link</button>
+            <a class="btn sm" [href]="waAlta(a)" target="_blank" rel="noopener" title="Enviar por WhatsApp"><app-icon name="send" [size]="13" /> WhatsApp</a>
+          } @else {
+            <button class="btn sm primary" (click)="viewingAlta.set(a)"><app-icon name="eye" [size]="13" /> Ver datos</button>
+          }
+          <button class="btn sm ghost danger" (click)="deleteAlta(a)" title="Eliminar" aria-label="Eliminar alta"><app-icon name="trash" [size]="13" /></button>
+        </div>
+      } @empty {
+        <small class="muted">Aún no has creado links de alta.</small>
+      }
+    </div>
+  </section>
+
   @if (auth.isOwner()) {
     <section class="card supers">
       <div class="card-head"><app-icon name="sparkles" [size]="16" /><h2>Super administradores</h2><span class="spacer"></span><small class="muted">Solo tú (dueño de la plataforma) puedes agregar o quitar super administradores.</small></div>
@@ -200,6 +235,65 @@
       <div class="modal-foot">
         <button class="btn" (click)="editing.set(null)">Cancelar</button>
         <button class="btn primary" (click)="save()">{{ isNew() ? 'Crear cliente' : 'Guardar' }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===================== Modal alta de cliente ===================== -->
+@if (viewingAlta(); as a) {
+  <div class="overlay" (click)="viewingAlta.set(null)">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-head"><app-icon name="plug" /><h2>{{ a.label }}</h2><span class="badge" [class.warn]="a.status === 'enviado'" [class.ok]="a.status === 'revisado'">{{ altaStatusLabel[a.status] }}</span><span class="spacer"></span><button class="btn ghost icon-only sm" (click)="viewingAlta.set(null)"><app-icon name="x" /></button></div>
+      <div class="modal-body">
+        @if (a.form; as f) {
+          <h3>Negocio <small class="muted">{{ f.hasRut ? 'con RUT' : 'sin RUT' }}{{ f.business.tipo ? ' · ' + (f.business.tipo === 'natural' ? 'persona natural' : 'empresa') : '' }}</small></h3>
+          <div class="kv">
+            @for (k of bizFields; track k.key) {
+              @if (f.business[k.key]) {
+                <span>{{ k.label }}</span>
+                <b>{{ f.business[k.key] }}@if (a.ocr && a.ocr[k.key] && a.ocr[k.key] !== f.business[k.key]) { <small class="muted"> (el documento decía: {{ a.ocr[k.key] }})</small> }</b>
+              }
+            }
+          </div>
+          @if (a.doc) {
+            <button class="btn sm" style="align-self:flex-start" (click)="downloadAltaDoc(a)"><app-icon name="download" [size]="13" /> Descargar {{ docKindLabel[a.doc.kind] }} ({{ a.doc.size < 1048576 ? (a.doc.size / 1024).toFixed(0) + ' KB' : (a.doc.size / 1048576).toFixed(1) + ' MB' }})</button>
+          } @else { <small class="muted">No subió documento.</small> }
+
+          <h3>Contacto</h3>
+          <div class="kv">
+            <span>Nombre</span><b>{{ f.contact.name }}</b>
+            <span>Celular</span><b>{{ f.contact.phone }}</b>
+            @if (f.contact.email) { <span>Correo</span><b>{{ f.contact.email }}</b> }
+          </div>
+
+          <h3>Redes y WhatsApp</h3>
+          <div class="kv">
+            @if (f.instagram) { <span>Instagram</span><b>{{ f.instagram }}</b> }
+            @if (f.facebook) { <span>Facebook</span><b>{{ f.facebook }}</b> }
+            @if (f.web) { <span>Sitio web</span><b>{{ f.web }}</b> }
+            @if (f.whatsappNumber) { <span>WhatsApp</span><b>{{ f.whatsappNumber }}</b> }
+            <span>Qué quiere</span><b>{{ waModeLabel[f.whatsappMode] }}</b>
+          </div>
+
+          <h3>Meta</h3>
+          <div class="kv">
+            <span>¿Tiene Meta Business?</span><b>{{ metaLabel[f.hasMetaBusiness] }}</b>
+            @if (f.facebookEmail) { <span>Correo de su Facebook</span><b>{{ f.facebookEmail }}</b> }
+          </div>
+          @if (f.help.length) {
+            <p class="muted sub">Necesita ayuda con:</p>
+            <ul class="help">@for (h of f.help; track h) { <li>{{ helpLabel[h] }}</li> }</ul>
+          }
+          @if (f.notes) { <p class="muted sub">Comentarios:</p><p class="notes-text">{{ f.notes }}</p> }
+        } @else {
+          <p class="muted">El cliente todavía no ha enviado el formulario.</p>
+        }
+      </div>
+      <div class="modal-foot">
+        <button class="btn" (click)="setAltaStatus(a, 'pendiente')" title="Deja que el cliente corrija y vuelva a enviar">Reabrir formulario</button>
+        @if (a.status !== 'revisado') { <button class="btn" (click)="setAltaStatus(a, 'revisado')"><app-icon name="check" [size]="13" /> Marcar revisado</button> }
+        @if (a.form && !a.tenantId) { <button class="btn primary" (click)="tenantFromAlta(a)"><app-icon name="plus" [size]="13" /> Crear cliente con estos datos</button> }
       </div>
     </div>
   </div>

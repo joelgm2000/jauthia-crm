@@ -10,6 +10,9 @@ import { BusinessProfileForm, cleanProfile } from '../../ui/business-profile-for
 import { Icon } from '../../ui/icon';
 import { AgoPipe, CopPipe } from '../../ui/pipes';
 import { DAY } from '@shared/time';
+import {
+  BUSINESS_FIELDS, DOC_KIND_LABEL, HELP_OPTIONS, ONBOARDING_STATUS_LABEL, OnboardingStatus, OnboardingSummary, WHATSAPP_MODE_LABEL,
+} from '@shared/onboarding';
 
 
 
@@ -61,6 +64,19 @@ export class SuperPanel implements OnInit {
   readonly tenantUsers = signal<CrmUserInfo[]>([]);
   nu = { name: '', email: '', password: '', role: 'asesor' as 'admin' | 'asesor' };
 
+  // Altas de clientes (link para que el cliente suba su RUT y sus datos de Meta)
+  readonly altas = signal<OnboardingSummary[]>([]);
+  readonly viewingAlta = signal<OnboardingSummary | null>(null);
+  altaLabel = '';
+  altaTenant = '';
+  readonly altaStatusLabel = ONBOARDING_STATUS_LABEL;
+  readonly bizFields = BUSINESS_FIELDS;
+  readonly docKindLabel = DOC_KIND_LABEL;
+  readonly waModeLabel = WHATSAPP_MODE_LABEL;
+  readonly helpLabel = Object.fromEntries(HELP_OPTIONS.map((h) => [h.id, h.label])) as Record<string, string>;
+  readonly metaLabel: Record<string, string> = { si: 'Sí', no: 'No', no_se: 'No sabe' };
+  readonly newAltas = computed(() => this.altas().filter((a) => a.status === 'enviado').length);
+
   // Super administradores
   readonly supers = signal<CrmUserInfo[]>([]);
   ns = { name: '', email: '', password: '' };
@@ -87,6 +103,7 @@ export class SuperPanel implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+    await this.loadAltas();
     if (this.auth.isOwner()) await this.loadSupers();
   }
 
@@ -225,6 +242,86 @@ export class SuperPanel implements OnInit {
     this.nu = { name: '', email: '', password: '', role: 'asesor' };
     this.tenantUsers.set((await this.store.superCall('listTenantUsers', { tenantId: t.id })).users);
     await this.load();
+  }
+
+  // ---- Altas de clientes ----
+  async loadAltas(): Promise<void> {
+    this.altas.set((await this.store.superCall('listOnboardings', {})).onboardings);
+  }
+
+  altaLink(a: OnboardingSummary): string {
+    return `${location.origin}/alta/${a.token}`;
+  }
+
+  async createAlta(): Promise<void> {
+    const { onboarding } = await this.store.superCall('createOnboarding', { label: this.altaLabel.trim(), ...(this.altaTenant ? { tenantId: this.altaTenant } : {}) });
+    this.altaLabel = '';
+    this.altaTenant = '';
+    await this.loadAltas();
+    await this.copyAlta(onboarding);
+  }
+
+  async copyAlta(a: OnboardingSummary): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.altaLink(a));
+      this.store.toast('Link copiado: envíaselo al cliente', 'success');
+    } catch {
+      prompt('Copia este link y envíaselo al cliente:', this.altaLink(a));
+    }
+  }
+
+  /** Abre WhatsApp con el mensaje listo (el número lo eliges tú en WhatsApp). */
+  waAlta(a: OnboardingSummary): string {
+    const text = `Hola ${a.label} 👋 Para conectar tu WhatsApp, Instagram y Facebook con JAUTHIA CRM, llena este formulario (toma unos 5 minutos). Si tienes el RUT a la mano, súbelo y los datos se llenan solos: ${this.altaLink(a)}`;
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  }
+
+  async downloadAltaDoc(a: OnboardingSummary): Promise<void> {
+    const d = await this.store.superCall('getOnboardingDoc', { id: a.id });
+    const bytes = Uint8Array.from(atob(d.base64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: d.mime }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = d.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+
+  async setAltaStatus(a: OnboardingSummary, status: OnboardingStatus): Promise<void> {
+    await this.store.superCall('setOnboardingStatus', { id: a.id, status });
+    this.store.toast(status === 'pendiente' ? 'Formulario reabierto: el cliente puede volver a enviarlo' : 'Marcado como revisado', 'success');
+    await this.loadAltas();
+    this.viewingAlta.set(this.altas().find((x) => x.id === a.id) ?? null);
+  }
+
+  async deleteAlta(a: OnboardingSummary): Promise<void> {
+    if (!confirm(`¿Eliminar el alta de ${a.label}? Se borran sus datos y su documento para siempre.`)) return;
+    await this.store.superCall('deleteOnboarding', { id: a.id });
+    this.viewingAlta.set(null);
+    await this.loadAltas();
+  }
+
+  /** Abre "Nuevo cliente" con los datos que envió el cliente. */
+  tenantFromAlta(a: OnboardingSummary): void {
+    const f = a.form;
+    if (!f) return;
+    const b = f.business;
+    this.viewingAlta.set(null);
+    this.create();
+    const t = this.editing()!;
+    this.editing.set({
+      ...t,
+      name: b.nombreComercial || b.nombre || a.label,
+      legalId: [b.nit, b.dv].filter(Boolean).join('-'),
+      address: b.direccion ?? '',
+      city: b.ciudad ?? '',
+      contactName: f.contact.name,
+      contactEmail: f.contact.email || b.correo || '',
+      contactPhone: f.contact.phone,
+      notes: `Alta ${a.id}. ${f.hasRut ? 'Con RUT' : 'Sin RUT'}. Titular: ${b.nombre}${b.representante ? ' · Representante: ' + b.representante : ''}.`,
+    });
+    this.adminName = f.contact.name;
+    this.adminEmail = f.contact.email;
   }
 
   // ---- Super administradores (solo el dueño) ----

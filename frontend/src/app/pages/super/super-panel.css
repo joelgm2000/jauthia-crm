@@ -9,6 +9,24 @@ code { font-size: 11px; background: var(--hover); padding: 1px 5px; border-radiu
 .actions { white-space: nowrap; }
 .actions .btn { margin-left: 4px; }
 .supers { margin-top: 18px; }
+.altas { margin-top: 18px; }
+.add.first { margin-top: 0; padding-top: 0; border-top: 0; margin-bottom: 4px; }
+.add.first .input { max-width: 300px; }
+.add.first .select { max-width: 300px; }
+.alta { padding: 10px 0; border-top: 1px solid var(--line); gap: 8px; flex-wrap: wrap; }
+.who-alta { display: flex; flex-direction: column; min-width: 0; }
+.kv { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 6px 14px; margin-bottom: 10px; font-size: 14px; }
+.kv > span { color: var(--muted); }
+.kv b { font-weight: 600; overflow-wrap: anywhere; }
+.kv small { font-weight: 400; }
+.sub { margin: 8px 0 4px; }
+.help { margin: 0 0 8px; padding-left: 18px; }
+.notes-text { white-space: pre-wrap; margin: 0; }
+@media (max-width: 640px) {
+  .kv { grid-template-columns: 1fr; gap: 2px; }
+  .kv > span { margin-top: 6px; }
+  .add.first .input, .add.first .select { max-width: none; width: 100%; }
+}
 .sa { padding: 8px 0; border-bottom: 1px solid var(--line); gap: 10px; }
 .add { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); gap: 8px; }
 .add .input { max-width: 240px; }
