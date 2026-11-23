@@ -45,6 +45,12 @@ export const handlers: { [A in ApiAction]: Handler<A> } = {
     if (conv.optOutAt && d.draft.type === 'template') {
       throw new ApiError(409, 'Este cliente pidió no recibir más mensajes: no se le pueden enviar plantillas. Si él vuelve a escribir, puedes responderle.');
     }
+    if (d.draft.type === 'template' && !conv.optInAt && !conv.simulated) {
+      const tpl = d.draft.templateName ? (await loadCtx(tenant.id)).templates.find((t) => t.name === d.draft.templateName) : undefined;
+      if (tpl?.category === 'MARKETING') {
+        throw new ApiError(409, 'Este cliente no ha aceptado recibir promociones: WhatsApp no permite enviarle plantillas de marketing. Usa una plantilla de servicio (utilidad) o pídele permiso cuando escriba.');
+      }
+    }
     const msg = outboundMessage(d.draft, conv, 'asesor', user.name, now);
     await txEmit(async (c) => {
       if (d.pauseBot && conv.botActive) await insertMessage(tenant.id, noteMessage(conv.id, BOT_PAUSED_NOTE, now - 1), c);

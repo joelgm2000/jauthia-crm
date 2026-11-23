@@ -31,3 +31,30 @@ export function isOptOut(text: string): boolean {
   if (!t) return false;
   return WHOLE.test(t) || PATTERNS.some((p) => p.test(t));
 }
+
+// ---------------------------------------------------------------------------
+// Permiso para promociones (opt-in)
+// ---------------------------------------------------------------------------
+// WhatsApp exige permiso del cliente antes de escribirle por iniciativa del negocio (plantillas). Que nos escriba
+// permite responderle dentro de las 24 h, pero el remarketing y las alertas de compra fuera de ese plazo
+// solo se envían a quien aceptó con este botón.
+
+export const OPT_IN_TAG = 'acepta-promociones';
+export const OPT_IN_BTN = { yes: 'optin_si', no: 'optin_no' } as const;
+
+export interface OptInConfig {
+  /** Preguntar al pasar al asesor (una sola vez por cliente). */
+  enabled: boolean;
+  /** Pregunta; {empresa} se reemplaza por el nombre del negocio. */
+  message: string;
+}
+
+export const DEFAULT_OPT_IN: OptInConfig = {
+  enabled: true,
+  message: '¿Te avisamos por aquí de ofertas y novedades de {empresa}? Puedes escribir STOP cuando quieras para dejar de recibirlas.',
+};
+
+export const OPT_IN_REPLY = {
+  yes: '¡Listo! 🙌 Te avisaremos por aquí. Si algún día no quieres recibir más, escribe STOP.',
+  no: 'Perfecto, no te enviaremos promociones 👍',
+};

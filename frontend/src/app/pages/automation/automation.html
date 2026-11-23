@@ -49,7 +49,7 @@
                     @for (t of templates(); track t.id) { <option [ngValue]="t.id">{{ t.name }} · {{ t.status }}</option> }
                   </select></div>
                 <div class="warn"><app-icon name="info" [size]="14" />
-                  WhatsApp, Messenger e Instagram no permiten mensajes libres pasadas 24 h del último mensaje del cliente. En WhatsApp se envía la plantilla; en Messenger e Instagram el paso se omite. En el chat web y Telegram sale el mensaje normal.</div>
+                  WhatsApp, Messenger e Instagram no permiten mensajes libres pasadas 24 h del último mensaje del cliente. En WhatsApp se envía la plantilla, y solo a los clientes que aceptaron promociones con el botón del bot (WhatsApp exige su permiso); en Messenger e Instagram el paso se omite. En el chat web y Telegram sale el mensaje normal.</div>
                 @if (templateStatus(s.templateId); as warn) { <div class="warn"><app-icon name="info" [size]="14" /> {{ warn }}</div> }
               }
             </div>

@@ -218,6 +218,8 @@ export interface BotState {
   citaKind?: CitaKind;
   /** Citas: pregunta del flujo en la que estaba antes de pedir la cita (para volver si no agenda). */
   citaFrom?: string;
+  /** Ya se le preguntó si quiere recibir promociones (no se repite). */
+  optInAsked?: boolean;
 }
 
 /** Un producto del pedido del cliente (puede llevar varios). */
@@ -271,6 +273,8 @@ export interface Conversation {
   cita?: Cita | null;
   /** Cuándo pidió no recibir más mensajes (Meta exige respetarlo): sin remarketing, alertas ni plantillas. */
   optOutAt?: number | null;
+  /** Cuándo aceptó recibir promociones (botón del bot o el asesor con su autorización). Sin esto, nada de plantillas promocionales. */
+  optInAt?: number | null;
 }
 
 export interface CrmTask {

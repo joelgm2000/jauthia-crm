@@ -28,6 +28,8 @@ export interface ConversationEdit {
   cita?: Cita | null;
   /** false: el cliente volvió a autorizar mensajes (se quita el "no contactar"). */
   optOut?: false;
+  /** El cliente le dijo al asesor que sí (true) o que no (false) quiere recibir promociones. */
+  optIn?: boolean;
 }
 
 export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<Conversation> {
@@ -51,6 +53,12 @@ export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<C
   if (edit.optOut === false && conv.optOutAt) {
     patch.optOutAt = null;
     patch.tags = (patch.tags ?? conv.tags).filter((t) => t !== 'no-contactar');
+  }
+  if (edit.optIn !== undefined) {
+    const tags = (patch.tags ?? conv.tags).filter((t) => t !== 'acepta-promociones' && (!edit.optIn || t !== 'no-contactar'));
+    patch.tags = edit.optIn ? [...tags, 'acepta-promociones'] : tags;
+    patch.optInAt = edit.optIn ? Date.now() : null;
+    if (edit.optIn) patch.optOutAt = null;
   }
   return patch;
 }

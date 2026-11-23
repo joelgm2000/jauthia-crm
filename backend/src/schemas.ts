@@ -70,6 +70,7 @@ const edit = z.object({
   markRead: z.boolean().optional(),
   cita: z.object({ at: z.number(), status: z.enum(CITA_STATUSES), createdAt: z.number(), kind: z.enum(CITA_KINDS).optional() }).nullable().optional(),
   optOut: z.literal(false).optional(),
+  optIn: z.boolean().optional(),
 });
 
 const task = z.object({

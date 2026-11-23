@@ -203,6 +203,9 @@
           </div>
           <div class="row mt wrap">
             <button class="chip" [class.on]="c.priority === 'alta'" (click)="togglePriority()">⚡ Prioridad alta</button>
+            @if (c.channel === 'whatsapp' && !c.optOutAt) {
+              <button class="chip" [class.on]="!!c.optInAt" (click)="toggleOptIn()" [title]="c.optInAt ? 'Aceptó recibir promociones. Toca si te pidió no recibirlas.' : 'No ha aceptado promociones: no se le envían plantillas de marketing. Toca solo si te dio su permiso.'">{{ c.optInAt ? '✅ Acepta promociones' : 'Sin permiso de promociones' }}</button>
+            }
             <span class="chip">{{ c.value | cop: true }}</span>
           </div>
         </div>

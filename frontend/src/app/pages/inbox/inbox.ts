@@ -314,6 +314,14 @@ export class Inbox {
     if (c && confirm(`¿${c.name} te pidió volver a recibir mensajes? Solo hazlo si él lo autorizó.`)) this.store.editConversation(c.id, { optOut: false });
   }
 
+  /** Permiso para promociones: solo si el cliente lo dio (o lo retiró). */
+  toggleOptIn(): void {
+    const c = this.conv();
+    if (!c) return;
+    const want = !c.optInAt;
+    if (confirm(want ? `¿${c.name} te dio permiso para enviarle promociones por WhatsApp?` : `¿Quitar el permiso de promociones de ${c.name}?`)) this.store.editConversation(c.id, { optIn: want });
+  }
+
   togglePriority(): void {
     const c = this.conv();
     if (c) this.store.editConversation(c.id, { priority: c.priority === 'alta' ? 'normal' : 'alta' });

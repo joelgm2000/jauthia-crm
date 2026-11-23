@@ -57,4 +57,27 @@ assert.ok(!back.tags?.includes('no-contactar'));
 const old: FlowConfig = { ...structuredClone(DEFAULT_FLOW), required: [{ key: 'cedula', label: 'Cédula', when: 'antes_asesor' }, { key: 'nombre', label: 'Nombre', when: 'inicio' }] };
 assert.deepEqual(requiredOf(old).map((r) => r.key), ['nombre']);
 
-console.log('✔ Opt-out y datos sensibles: OK');
+// ---- Permiso para promociones (opt-in) ----
+// Al pasar al asesor (gimnasio) el bot pregunta UNA vez, solo en WhatsApp.
+const gym = run([{ text: 'Hola' }, { text: 'Joel, Valledupar' }, { buttonId: 'uso_negocio' }]);
+assert.ok(gym.texts.some((t) => t.includes('¿Te avisamos por aquí de ofertas')), gym.texts.join(' | '));
+assert.ok(gym.conv.bot.optInAsked);
+const yes = run([{ text: 'Hola' }, { text: 'Joel, Valledupar' }, { buttonId: 'uso_negocio' }, { buttonId: 'optin_si' }]);
+assert.ok(yes.conv.optInAt, 'aceptó (aunque el bot esté en pausa con el asesor)');
+assert.ok(yes.conv.tags.includes('acepta-promociones'));
+assert.ok(yes.texts[0].includes('escribe STOP'));
+const no = run([{ text: 'Hola' }, { text: 'Joel, Valledupar' }, { buttonId: 'uso_negocio' }, { buttonId: 'optin_no' }]);
+assert.ok(!no.conv.optInAt);
+// Fuera de las 24 h: sin permiso no sale la plantilla; con permiso sí
+const tpl: import('./models').WaTemplate = { id: 't1', name: 'promo', category: 'MARKETING', kind: 'text', status: 'APPROVED', language: 'es', body: 'Hola {{1}}', buttons: [] };
+const ax2 = { ...ax, templates: [tpl] };
+const old24 = (c: Conversation) => ({ ...c, lastInboundAt: NOW - 30 * HOUR }) as Conversation;
+assert.ok(autoDraft(old24(no.conv), ax2, 'Hola', undefined, 't1').skipped?.includes('no ha aceptado recibir promociones'));
+assert.equal(autoDraft(old24(yes.conv), ax2, 'Hola', undefined, 't1').draft?.type, 'template');
+// Dentro de las 24 h se le puede responder normal (la conversación la abrió él)
+assert.equal(autoDraft({ ...no.conv, lastInboundAt: NOW - HOUR } as Conversation, ax2, 'Hola', undefined, 't1').draft?.type, 'text');
+// Si después pide la baja, se pierde el permiso
+const later = run([{ text: 'Hola' }, { text: 'Joel, Valledupar' }, { buttonId: 'uso_negocio' }, { buttonId: 'optin_si' }, { text: 'ya no me escriban' }]);
+assert.ok(later.conv.optOutAt && !later.conv.optInAt && !later.conv.tags.includes('acepta-promociones'));
+
+console.log('✔ Opt-out, permiso de promociones y datos sensibles: OK');

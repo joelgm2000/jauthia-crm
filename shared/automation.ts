@@ -78,6 +78,8 @@ export function autoDraft(
   if (!outsideWindow(conv, ax.now)) {
     return { draft: imageUrl ? { type: 'image', text: body, imageUrl } : { type: 'text', text: body } };
   }
+  // Fuera de las 24 h el mensaje lo inicia el negocio: WhatsApp exige que el cliente haya aceptado promociones.
+  if (!conv.optInAt && !conv.simulated) return { skipped: 'pasaron más de 24 h y el cliente no ha aceptado recibir promociones (WhatsApp exige su permiso)' };
   const tpl = templateId ? ax.templates.find((t) => t.id === templateId) : undefined;
   if (conv.channel === 'whatsapp' && tpl && (tpl.status === 'APPROVED' || conv.simulated)) {
     const [draft] = templateDrafts(tpl, ax.products, vars, true);

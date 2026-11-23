@@ -10,7 +10,7 @@ import {
 } from './citas';
 import { isOpen, nextOpening } from './hours';
 import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, ProductVariant, StageId } from './models';
-import { isOptOut, OPT_OUT_REPLY, OPT_OUT_TAG } from './optout';
+import { DEFAULT_OPT_IN, isOptOut, OPT_IN_BTN, OPT_IN_REPLY, OPT_IN_TAG, OPT_OUT_REPLY, OPT_OUT_TAG } from './optout';
 import { parseCorrection, parseNameCity } from './parse';
 import {
   AVAIL_LABEL, BTN, cartText, cartValue, detectProducts, hasVariants, matchVariant, OutgoingDraft, parseVariantButton, productCard, productDetails, recommend, variantButtonId,
@@ -173,7 +173,8 @@ class Run {
       value: c.value,
       ...(c.cart ? { cart: c.cart } : {}),
       ...(c.cita !== undefined ? { cita: c.cita } : {}),
-      ...(c.optOutAt ? { optOutAt: c.optOutAt } : {}),
+      ...(c.optOutAt !== undefined ? { optOutAt: c.optOutAt } : {}),
+      ...(c.optInAt !== undefined ? { optInAt: c.optInAt } : {}),
     };
     return { replies: this.replies, patch, tasks: this.tasks, notes: this.notes };
   }
@@ -198,6 +199,8 @@ class Run {
     // "No me escriban más": se respeta de inmediato (política de Meta), con el bot activo o en pausa.
     if (!c.optOutAt && !input.buttonId && isOptOut(text)) {
       c.optOutAt = this.ctx.now;
+      c.optInAt = null;
+      c.tags = c.tags.filter((t) => t !== OPT_IN_TAG);
       if (!c.tags.includes(OPT_OUT_TAG)) c.tags.push(OPT_OUT_TAG);
       this.replies.push({ type: 'text', text: OPT_OUT_REPLY });
       this.notes.push('🚫 El cliente pidió no recibir más mensajes: se apagaron el remarketing, las alertas de compra y las plantillas para él. Si vuelve a escribir, sí se le puede responder.');
@@ -216,12 +219,12 @@ class Run {
         }
       }
       // Botones de citas (se ofrecen al pasar al asesor): funcionan aunque el bot esté en pausa.
-      if (input.buttonId) this.handleCitaButton(input.buttonId);
+      if (input.buttonId && !this.handleOptInButton(input.buttonId)) this.handleCitaButton(input.buttonId);
       return;
     }
 
     // 1) Botones de las tarjetas de producto y de las citas (válidos en cualquier punto del flujo).
-    if (input.buttonId && (this.handleProductButton(input.buttonId) || this.handleCitaButton(input.buttonId))) return;
+    if (input.buttonId && (this.handleOptInButton(input.buttonId) || this.handleProductButton(input.buttonId) || this.handleCitaButton(input.buttonId))) return;
 
     // 2) Pregunta frecuente ("¿hacen envíos?"): responde y retoma el control de la conversación.
     const faq = input.buttonId ? undefined : (this.flow.faqs ?? []).find((f) => f.keywords.some((k) => includesWord(norm, k)));
@@ -1095,6 +1098,7 @@ class Run {
       });
     }
     if (!open) this.say(s.hours.outOfHoursMessage);
+    this.askOptIn();
 
     this.moveStage('asesor');
     c.botActive = false;
@@ -1133,6 +1137,42 @@ class Run {
   /** ¿El bot lleva la conversación? Con el bot en pausa los botones responden, pero no se cambia en qué pregunta va. */
   private get tracking(): boolean {
     return this.conv.botActive;
+  }
+
+  /** Una sola vez, al pasar al asesor y solo en WhatsApp (el único canal con plantillas promocionales). */
+  private askOptIn(): void {
+    const c = this.conv;
+    const cfg = { ...DEFAULT_OPT_IN, ...(this.flow.optIn ?? {}) };
+    if (!cfg.enabled || c.channel !== 'whatsapp' || c.optInAt || c.optOutAt || c.bot.optInAsked) return;
+    c.bot.optInAsked = true;
+    this.replies.push({
+      type: 'buttons',
+      text: this.fill(cfg.message),
+      buttons: [
+        { id: OPT_IN_BTN.yes, title: 'Sí, avísenme' },
+        { id: OPT_IN_BTN.no, title: 'No, gracias' },
+      ],
+    });
+  }
+
+  /** Respuesta a la pregunta de promociones (funciona aunque el bot esté en pausa). */
+  private handleOptInButton(id: string): boolean {
+    const c = this.conv;
+    if (id !== OPT_IN_BTN.yes && id !== OPT_IN_BTN.no) return false;
+    if (id === OPT_IN_BTN.yes) {
+      c.optInAt = this.ctx.now;
+      c.optOutAt = null;
+      c.tags = c.tags.filter((t) => t !== OPT_OUT_TAG);
+      if (!c.tags.includes(OPT_IN_TAG)) c.tags.push(OPT_IN_TAG);
+      this.say(OPT_IN_REPLY.yes);
+      this.notes.push('✅ Aceptó recibir promociones por WhatsApp.');
+    } else {
+      c.optInAt = null;
+      c.tags = c.tags.filter((t) => t !== OPT_IN_TAG);
+      this.say(OPT_IN_REPLY.no);
+      this.notes.push('El cliente prefirió no recibir promociones: no se le enviarán plantillas de remarketing ni alertas.');
+    }
+    return true;
   }
 
   private handleCitaButton(id: string): boolean {

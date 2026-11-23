@@ -3,6 +3,7 @@
  * Todo lo que dice y decide el bot vive aquí como datos: se edita desde
  * la pantalla "Flujo del bot" y se guarda en PostgreSQL (tabla settings, clave "flow").
  */
+import type { OptInConfig } from './optout';
 import { ContactFields, StageDef, StageId } from './models';
 import { DEFAULT_REQUIRED, RequiredDatum, SellerPersona } from './seller';
 import type { CitasConfig } from './citas';
@@ -107,6 +108,8 @@ export interface FlowConfig {
   persona?: SellerPersona;
   /** Citas en la tienda (y videollamada / domicilio para quien no puede venir). */
   citas?: CitasConfig;
+  /** Pregunta de permiso para promociones (opt-in que exige WhatsApp). */
+  optIn?: OptInConfig;
   /** Datos que el vendedor SIEMPRE debe conocer (y cuándo pedirlos). Si falta, se usan DEFAULT_REQUIRED. */
   required?: RequiredDatum[];
   messages: {
