@@ -143,3 +143,5 @@
 .suggest details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 .suggest details { display: flex; flex-direction: column; gap: 6px; }
 .suggest details .btn { margin-top: 4px; }
+.optout { border-color: #fecaca; background: #fef2f2; }
+:root[data-theme='dark'] .optout { background: #2a1111; border-color: #5a1f1f; }

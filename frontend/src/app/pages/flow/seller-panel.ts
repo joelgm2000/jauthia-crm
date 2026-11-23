@@ -1,14 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DEFAULT_FLOW, FlowConfig, FlowNode } from '@shared/flow';
-import { buildSellerPrompt, DEFAULT_PERSONA, DEFAULT_REQUIRED, REQUIRED_LABELS, RequiredDatum, RequiredKey, SELLER_TONES } from '@shared/seller';
+import { buildSellerPrompt, DEFAULT_PERSONA, DEFAULT_REQUIRED, NEVER_ASK, REQUIRED_LABELS, RequiredDatum, RequiredKey, SELLER_TONES } from '@shared/seller';
 import { CrmStore } from '../../core/data/crm-store';
 import { Icon } from '../../ui/icon';
 
 /** Pregunta por defecto para cada dato que se puede volver obligatorio. */
 const DEFAULT_QUESTIONS: Partial<Record<RequiredKey, string>> = {
   correo: '¿A qué correo te enviamos la cotización? 📧',
-  cedula: '¿Me compartes tu número de cédula para la factura?',
   direccion: '¿Cuál es la dirección de entrega?',
   formaPago: '¿Cómo te gustaría pagar? (efectivo, transferencia, tarjeta…)',
 };
@@ -16,7 +15,7 @@ const DEFAULT_QUESTIONS: Partial<Record<RequiredKey, string>> = {
 /** Completa un flujo antiguo con el vendedor, los datos obligatorios y sus preguntas por defecto. */
 export function ensureSellerConfig(f: FlowConfig): FlowConfig {
   f.persona = { ...DEFAULT_PERSONA, ...(f.persona ?? {}) };
-  f.required = f.required ?? structuredClone(DEFAULT_REQUIRED);
+  f.required = (f.required ?? structuredClone(DEFAULT_REQUIRED)).filter((r) => !NEVER_ASK.includes(r.key));
   for (const r of f.required) {
     if (r.nodeId && !f.nodes.some((n) => n.id === r.nodeId)) {
       const def = DEFAULT_FLOW.nodes.find((n) => n.id === r.nodeId);

@@ -41,6 +41,10 @@ export const handlers: { [A in ApiAction]: Handler<A> } = {
   // ---------------- Asesor ----------------
   sendMessage: async (d, { tenant, user, now }) => {
     const conv = await getConv(tenant.id, d.conversationId);
+    // Plantillas = mensajes que inicia el negocio: prohibidos si el cliente pidió no recibir más (política de Meta).
+    if (conv.optOutAt && d.draft.type === 'template') {
+      throw new ApiError(409, 'Este cliente pidió no recibir más mensajes: no se le pueden enviar plantillas. Si él vuelve a escribir, puedes responderle.');
+    }
     const msg = outboundMessage(d.draft, conv, 'asesor', user.name, now);
     await txEmit(async (c) => {
       if (d.pauseBot && conv.botActive) await insertMessage(tenant.id, noteMessage(conv.id, BOT_PAUSED_NOTE, now - 1), c);

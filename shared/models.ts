@@ -269,6 +269,8 @@ export interface Conversation {
   lastAlertAt?: number;
   /** Cita en la tienda o por videollamada que agendó con el bot (o el asesor). */
   cita?: Cita | null;
+  /** Cuándo pidió no recibir más mensajes (Meta exige respetarlo): sin remarketing, alertas ni plantillas. */
+  optOutAt?: number | null;
 }
 
 export interface CrmTask {

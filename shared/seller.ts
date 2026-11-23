@@ -41,8 +41,14 @@ export interface RequiredDatum {
 /** Etiquetas de los datos que se pueden exigir. */
 export const REQUIRED_LABELS: Partial<Record<RequiredKey, string>> = {
   nombre: 'Nombre', ciudad: 'Ciudad', producto: 'Producto de interés', cantidad: 'Cantidad',
-  uso: 'Uso (casa o negocio)', correo: 'Correo', cedula: 'Cédula', direccion: 'Dirección', formaPago: 'Forma de pago',
+  uso: 'Uso (casa o negocio)', correo: 'Correo', direccion: 'Dirección', formaPago: 'Forma de pago',
 };
+
+/**
+ * Datos que el bot NUNCA pide por chat: la política de WhatsApp prohíbe pedir números de identificación,
+ * de tarjetas o de cuentas. El asesor los toma por otro medio (ej. al facturar en la tienda).
+ */
+export const NEVER_ASK: RequiredKey[] = ['cedula'];
 
 /** Valor que se guarda cuando el cliente dio su nombre pero no la ciudad. */
 export const NO_CITY = '(sin ciudad)';
@@ -92,7 +98,7 @@ export function personaOf(flow: Pick<FlowConfig, 'persona'>): SellerPersona {
 
 /** Datos obligatorios efectivos del flujo. */
 export function requiredOf(flow: Pick<FlowConfig, 'required'>): RequiredDatum[] {
-  return flow.required ?? DEFAULT_REQUIRED;
+  return (flow.required ?? DEFAULT_REQUIRED).filter((r) => !NEVER_ASK.includes(r.key));
 }
 
 const list = (items: string[]) => items.map((x) => `- ${x}`).join('\n');

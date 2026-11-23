@@ -308,6 +308,12 @@ export class Inbox {
     if (c) this.store.editConversation(c.id, { assignedTo: id || null });
   }
 
+  /** Solo si el cliente pidió volver a recibir mensajes: quita el "no contactar". */
+  allowMessages(): void {
+    const c = this.conv();
+    if (c && confirm(`¿${c.name} te pidió volver a recibir mensajes? Solo hazlo si él lo autorizó.`)) this.store.editConversation(c.id, { optOut: false });
+  }
+
   togglePriority(): void {
     const c = this.conv();
     if (c) this.store.editConversation(c.id, { priority: c.priority === 'alta' ? 'normal' : 'alta' });

@@ -114,6 +114,7 @@ export async function sendSaleAlerts(tenantId: string, buyerId: string, from: St
        AND (data->>'waitingSince')::bigint <= $4
        AND COALESCE((data->>'lastAlertAt')::bigint, 0) <= $5
        AND COALESCE((data->>'simulated')::boolean, false) = $6
+       AND data->>'optOutAt' IS NULL
        AND ($7::text IS NULL OR data->'fields'->>'categoria' = $7)
      ORDER BY (data->>'score')::int DESC
      LIMIT $8`,

@@ -70,6 +70,7 @@ export function autoDraft(
   templateId: string | undefined,
   extraVars: Record<string, string> = {},
 ): { draft?: OutgoingDraft; skipped?: string } {
+  if (conv.optOutAt) return { skipped: 'el cliente pidió no recibir más mensajes' };
   const vars: MessageVars = { ...convVars(conv, ax.products, ax.companyName), ...extraVars };
   // "Foto del producto que le interesa": cada cliente recibe la de su producto (si no hay, va sin imagen).
   if (imageUrl === PRODUCT_IMAGE) imageUrl = interestProduct(conv, ax.products)?.imageUrl || undefined;
@@ -99,7 +100,7 @@ export interface FollowUpAction {
 export function followUpDue(conv: Conversation, flow: FlowConfig, ax: AutoContext): FollowUpAction | null {
   const rm = { ...DEFAULT_REMARKETING, ...(flow.remarketing ?? {}) };
   const since = conv.waitingSince ?? conv.bot.awaitingSince;
-  if (!rm.enabled || !since) return null;
+  if (!rm.enabled || !since || conv.optOutAt) return null;
   if (!rm.stages.includes(conv.stage)) return null;
   if (!conv.botActive && !rm.withAdvisor) return null;
   const step = conv.bot.followUpStep ?? 0;

@@ -207,6 +207,14 @@
           </div>
         </div>
 
+        @if (c.optOutAt) {
+          <div class="block cart optout">
+            <span class="label"><app-icon name="info" [size]="13" /> Pidió no recibir más mensajes</span>
+            <small>Desde hace {{ c.optOutAt | ago }}. No se le envían remarketing, alertas ni plantillas (política de Meta). Si él escribe, sí puedes responderle.</small>
+            <button class="btn sm" style="align-self:flex-start" (click)="allowMessages()" title="Úsalo solo si el cliente te pidió volver a recibir mensajes">El cliente volvió a autorizar mensajes</button>
+          </div>
+        }
+
         @if (c.cita; as ct) {
           <div class="block cart">
             <span class="label"><app-icon name="clock" [size]="13" /> Cita · {{ citaStatus[ct.status] }}</span>

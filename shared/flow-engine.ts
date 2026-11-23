@@ -10,6 +10,7 @@ import {
 } from './citas';
 import { isOpen, nextOpening } from './hours';
 import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, ProductVariant, StageId } from './models';
+import { isOptOut, OPT_OUT_REPLY, OPT_OUT_TAG } from './optout';
 import { parseCorrection, parseNameCity } from './parse';
 import {
   AVAIL_LABEL, BTN, cartText, cartValue, detectProducts, hasVariants, matchVariant, OutgoingDraft, parseVariantButton, productCard, productDetails, recommend, variantButtonId,
@@ -172,6 +173,7 @@ class Run {
       value: c.value,
       ...(c.cart ? { cart: c.cart } : {}),
       ...(c.cita !== undefined ? { cita: c.cita } : {}),
+      ...(c.optOutAt ? { optOutAt: c.optOutAt } : {}),
     };
     return { replies: this.replies, patch, tasks: this.tasks, notes: this.notes };
   }
@@ -192,6 +194,15 @@ class Run {
     if (c.stage === 'nuevo') this.moveStage('calificando');
 
     this.detectSignals(norm, input);
+
+    // "No me escriban más": se respeta de inmediato (política de Meta), con el bot activo o en pausa.
+    if (!c.optOutAt && !input.buttonId && isOptOut(text)) {
+      c.optOutAt = this.ctx.now;
+      if (!c.tags.includes(OPT_OUT_TAG)) c.tags.push(OPT_OUT_TAG);
+      this.replies.push({ type: 'text', text: OPT_OUT_REPLY });
+      this.notes.push('🚫 El cliente pidió no recibir más mensajes: se apagaron el remarketing, las alertas de compra y las plantillas para él. Si vuelve a escribir, sí se le puede responder.');
+      return;
+    }
 
     // Con el bot apagado solo se analizan señales (alertas y puntaje).
     if (!c.botActive) {

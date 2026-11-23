@@ -16,6 +16,7 @@ node conversations.mjs        # 12 conversaciones del bot      → results/conve
 node shots.mjs tenant         # capturas del CRM               → results/shots/
 node automation.mjs           # remarketing y alertas de compra → results/automation.json
 sh restart.sh && node conversations.mjs && node citas.mjs   # citas, garantía y gimnasio → asesor (con capturas)
+sh restart.sh && node optout.mjs   # "no me escriban más": confirmación, bloqueo de plantillas y desbloqueo
 sh restart.sh && node onboarding.mjs && node onboarding-shot.mjs   # alta de clientes (link + RUT leído gratis en el servidor; QA_CLAUDE=1 para la versión con Claude)
 node shots.mjs auto           # capturas de esos chats y de la pantalla de remarketing
 node load.mjs 50,200,500,1000,2000   # masividad               → results/load.json

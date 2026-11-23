@@ -26,6 +26,8 @@ export interface ConversationEdit {
   markRead?: boolean;
   /** Cambiar el estado de la cita (asistió, no vino, cancelada) o quitarla (null). */
   cita?: Cita | null;
+  /** false: el cliente volvió a autorizar mensajes (se quita el "no contactar"). */
+  optOut?: false;
 }
 
 export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<Conversation> {
@@ -46,6 +48,10 @@ export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<C
   if (edit.clearIntent) patch.intent = null;
   if (edit.markRead) patch.unread = 0;
   if (edit.cita !== undefined) patch.cita = edit.cita;
+  if (edit.optOut === false && conv.optOutAt) {
+    patch.optOutAt = null;
+    patch.tags = (patch.tags ?? conv.tags).filter((t) => t !== 'no-contactar');
+  }
   return patch;
 }
 
