@@ -72,6 +72,9 @@ export function buildSummary(conv: Conversation, products: Product[]): string {
     f.tipoPropiedad ? `Para ${f.tipoPropiedad}` : '',
     f.gastoLuz ? `Paga de luz: ${f.gastoLuz}` : '',
     f.recibo ? `Recibo: ${f.recibo}` : '',
+    f.propietario ? `Propietario: ${f.propietario}` : '',
+    f.objetivo ? `Busca: ${f.objetivo}` : '',
+    f.horaLlamada ? `Llamar: ${f.horaLlamada}` : '',
     ...(conv.cart?.length
       ? [`Pedido: ${cartText(conv.cart)}`]
       : [f.cantidad ? `Cantidad: ${f.cantidad}` : '', model ? `Modelo: ${model}` : '']),

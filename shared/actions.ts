@@ -12,7 +12,7 @@ import { ContactFields, Conversation, StageId } from './models';
 export const EDITABLE_FIELDS = [
   'ciudad', 'uso', 'categoria', 'subcategoria', 'modeloInteres', 'cantidad', 'pesoUsuario', 'modoUso',
   'alturaTecho', 'piso', 'espacio', 'usuarios', 'rangoKg', 'disponibilidad', 'formaPago', 'cedula', 'correo', 'direccion',
-  'tipoPropiedad', 'gastoLuz', 'recibo',
+  'tipoPropiedad', 'gastoLuz', 'recibo', 'propietario', 'objetivo', 'horaLlamada',
 ] as const satisfies readonly (keyof ContactFields)[];
 
 /** Propiedades de la conversación que un asesor puede cambiar directamente. */

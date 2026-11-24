@@ -31,6 +31,9 @@ const LABELS: Record<(typeof EDITABLE_FIELDS)[number], Omit<FieldLabel, 'key'>> 
   tipoPropiedad: { label: 'Tipo de propiedad' },
   gastoLuz: { label: 'Pago de luz al mes' },
   recibo: { label: 'Recibo de luz / NIC' },
+  propietario: { label: 'Propietario' },
+  objetivo: { label: 'Qué busca / tema' },
+  horaLlamada: { label: 'Hora para llamar' },
 };
 
 /** Campos del contacto en el orden en que se muestran (los mismos que el asesor puede editar). */

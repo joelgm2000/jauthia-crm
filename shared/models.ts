@@ -129,6 +129,12 @@ export interface ContactFields {
   gastoLuz?: string;
   /** Recibo de luz: foto enviada, número NIC o "lo envía después". */
   recibo?: string;
+  /** Si es propietario o inquilino del lugar. */
+  propietario?: string;
+  /** Qué busca (bajar la factura, respaldo…) o el tema de su consulta. */
+  objetivo?: string;
+  /** Franja en la que prefiere que lo llamen. */
+  horaLlamada?: string;
 }
 
 export interface QuickButton {
