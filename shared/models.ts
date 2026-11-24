@@ -177,6 +177,8 @@ export interface ChatMessage {
   imageUrl?: string;
   /** Video MP4 (mensajes de tipo "video"). */
   videoUrl?: string;
+  /** Archivo que mandó el cliente (PDF, audio, documento). Se ve solo con sesión: /api/files/:id. */
+  file?: { url: string; name: string; mime: string; size: number };
   buttons?: QuickButton[];
   /** Título del botón que abre la lista (WhatsApp list message). */
   listButton?: string;

@@ -102,6 +102,21 @@ CREATE TABLE IF NOT EXISTS onboardings (
   created_at BIGINT NOT NULL,
   expires_at BIGINT NOT NULL
 );
+
+-- Fotos, documentos, audios y videos que mandan los clientes por el chat (recibos, comprobantes…). CIFRADOS:
+-- tienen datos personales; solo se ven con sesión del mismo cliente (GET /api/files/:id).
+CREATE TABLE IF NOT EXISTS inbox_files (
+  tenant_id       TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  id              TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  mime            TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  size            INTEGER NOT NULL,
+  data_enc        TEXT NOT NULL,
+  created_at      BIGINT NOT NULL,
+  PRIMARY KEY (tenant_id, id)
+);
+CREATE INDEX IF NOT EXISTS inbox_files_conv ON inbox_files (tenant_id, conversation_id);
 `;
 
 export async function migrate(): Promise<void> {

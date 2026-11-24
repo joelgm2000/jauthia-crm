@@ -31,6 +31,8 @@ export interface EngineInput {
   text?: string;
   buttonId?: string;
   isMedia?: boolean;
+  /** image, document, audio, video, sticker. */
+  mediaKind?: string;
 }
 
 export interface EngineContext {
@@ -99,6 +101,11 @@ const PAYMENT_WORDS: [string, string][] = [
   ['plan separe', 'plan separe'],
   ['cuotas', 'plan separe'],
 ];
+
+/** Cómo queda registrada en el campo la respuesta que fue un archivo (p. ej. el recibo de luz). */
+const MEDIA_LABEL: Record<string, string> = {
+  image: '📷 Envió una foto', document: '📎 Envió un documento', audio: '🎤 Envió un audio', video: '🎥 Envió un video', sticker: '📷 Envió una imagen',
+};
 
 export function processIncoming(ctx: EngineContext, input: EngineInput): EngineResult {
   const flow = ctx.flow ?? DEFAULT_FLOW;
@@ -562,7 +569,7 @@ class Run {
     } else {
       if (norm.length < 1 && !input.isMedia) return false;
       // Una foto (p. ej. el recibo de luz) también responde la pregunta: el asesor la ve en el chat.
-      const value = input.isMedia ? '📷 Envió una foto' : text.trim();
+      const value = input.isMedia ? MEDIA_LABEL[input.mediaKind ?? 'image'] ?? '📎 Envió un archivo' : text.trim();
       if (node.field && node.field !== 'nombre_ciudad') (c.fields as Record<string, unknown>)[node.field] = value;
     }
     this.scoreDelta += 3;

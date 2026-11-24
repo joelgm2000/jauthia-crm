@@ -101,7 +101,11 @@ export interface Incoming {
   text: string;
   buttonId?: string;
   isMedia?: boolean;
+  /** Qué mandó: foto, documento, audio, video o sticker. */
+  mediaKind?: string;
   imageUrl?: string;
+  videoUrl?: string;
+  file?: ChatMessage['file'];
 }
 
 /** Guarda el mensaje entrante de un cliente y ejecuta su bot. */
@@ -130,12 +134,12 @@ export async function ingest(tenantId: string, inc: Incoming): Promise<{ convers
 
     const res = processIncoming(
       { conv, flow: ctx.flow, products: ctx.products, settings: ctx.settings, now },
-      { text: inc.text, buttonId: inc.buttonId, isMedia: inc.isMedia } satisfies EngineInput,
+      { text: inc.text, buttonId: inc.buttonId, isMedia: inc.isMedia, mediaKind: inc.mediaKind } satisfies EngineInput,
     );
 
     const inbound: ChatMessage = {
-      id: inId, conversationId: conv.id, direction: 'in', sender: 'cliente', type: inc.isMedia && inc.imageUrl ? 'image' : 'text',
-      text: inc.text, imageUrl: inc.imageUrl, replyToButtonId: inc.buttonId, channelMessageId: inc.channelMessageId, createdAt: now, processed: true,
+      id: inId, conversationId: conv.id, direction: 'in', sender: 'cliente', type: inc.isMedia && inc.imageUrl ? 'image' : inc.isMedia && inc.videoUrl ? 'video' : 'text',
+      text: inc.text, imageUrl: inc.imageUrl, videoUrl: inc.videoUrl, file: inc.file, replyToButtonId: inc.buttonId, channelMessageId: inc.channelMessageId, createdAt: now, processed: true,
     };
     if (!(await insertMessage(tenantId, inbound, c))) return { conversationId: conv.id, inbound: undefined, replies: [] as ChatMessage[], stageFrom: undefined, stageTo: undefined };
 

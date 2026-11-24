@@ -46,6 +46,16 @@ export interface ButtonPick {
       <div class="bubble" [class.has-img]="!!m.imageUrl || !!m.videoUrl">
         @if (m.imageUrl) { <img class="hero" [src]="m.imageUrl" [alt]="m.header || 'imagen'" loading="lazy" /> }
         @if (m.videoUrl) { <video class="hero" [src]="m.videoUrl" controls preload="metadata" playsinline></video> }
+        @if (m.file; as f) {
+          @if (f.mime.startsWith('audio/')) {
+            <audio class="audio" [src]="f.url" controls preload="metadata"></audio>
+          } @else {
+            <a class="file" [href]="f.url" target="_blank" rel="noopener">
+              <app-icon [name]="f.mime === 'application/pdf' ? 'note' : 'download'" [size]="22" />
+              <span><b>{{ f.name }}</b><small>{{ f.mime === 'application/pdf' ? 'PDF' : f.mime }} · {{ kb(f.size) }}</small></span>
+            </a>
+          }
+        }
         @if (m.header) { <div class="header">{{ m.header }}</div> }
         <div class="text" [innerHTML]="m.text | wa"></div>
         @if (m.footer) { <div class="footer">{{ m.footer }}</div> }
@@ -90,6 +100,11 @@ export interface ButtonPick {
     .bubble.has-img .text, .bubble.has-img .header, .bubble.has-img .footer { padding: 0 6px; }
     .hero { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 7px; margin-bottom: 6px; }
     video.hero { object-fit: contain; background: #000; }
+    .audio { width: 260px; max-width: 100%; margin-bottom: 4px; }
+    .file { display: flex; gap: 10px; align-items: center; padding: 8px 10px; margin-bottom: 4px; border-radius: 8px; background: rgba(0,0,0,.05); color: inherit; text-decoration: none; }
+    .file span { display: flex; flex-direction: column; min-width: 0; }
+    .file b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+    .file small { opacity: .7; }
     .header { font-weight: 700; margin-bottom: 2px; }
     .footer { font-size: 12px; color: var(--muted); margin-top: 4px; }
     time { display: flex; gap: 3px; align-items: center; justify-content: flex-end; font-size: 11px; color: var(--muted); margin-top: 2px; }
@@ -123,6 +138,10 @@ export class MessageBubble {
   readonly interactive = input(false);
   readonly pick = output<ButtonPick>();
   readonly listOpen = signal(false);
+
+  kb(bytes: number): string {
+    return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
 
   readonly hostClass = computed(() => {
     const m = this.msg();

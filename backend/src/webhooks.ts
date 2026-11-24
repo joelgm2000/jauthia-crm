@@ -20,7 +20,8 @@ import { ChannelType, ChatMessage, Tenant } from '../../shared/models';
 import { MINUTE } from '../../shared/time';
 import { getTenant } from './auth';
 import { config } from './config';
-import { ingest, loadCtx, updateStatus } from './core';
+import { ingest, Incoming, loadCtx, updateStatus } from './core';
+import { downloadWaMedia, saveInboxFile } from './inbox-files';
 import { fetchJson, GRAPH_URL, telegramUrl } from './http';
 import { getDoc, pool } from './db';
 import { log } from './log';
@@ -171,6 +172,27 @@ async function waSender(t: string, m: WaMessage): Promise<string | undefined> {
   return ids[0];
 }
 
+/**
+ * Foto, documento, audio o video que mandó el cliente: se descarga de Meta y se guarda cifrado para que el
+ * asesor lo vea en el chat (p. ej. el recibo de luz). Si falla, el mensaje entra igual con su texto.
+ */
+async function waMediaFile(t: string, externalId: string, m: WaMessage): Promise<Pick<Incoming, 'imageUrl' | 'videoUrl' | 'file'>> {
+  const media = m[m.type] as { id?: string; filename?: string; mime_type?: string } | undefined;
+  const token = (await getSecrets(t, 'whatsapp'))['accessToken'];
+  if (!media?.id || !token) return {};
+  try {
+    const { mime, bytes } = await downloadWaMedia(token, media.id);
+    const name = media.filename || `${m.type}`;
+    const f = await saveInboxFile(t, conversationId('whatsapp', externalId), media.mime_type?.split(';')[0] || mime, name, bytes);
+    if (m.type === 'image' || m.type === 'sticker') return { imageUrl: f.url };
+    if (m.type === 'video') return { videoUrl: f.url };
+    return { file: f };
+  } catch (e) {
+    log.error('No se pudo descargar el archivo de WhatsApp', { tenant: t, type: m.type, error: (e as Error).message });
+    return {};
+  }
+}
+
 /** Estados y mensajes entrantes de WhatsApp de un cliente. */
 async function handleWaValue(t: string, v: WaValue): Promise<void> {
   await each(v.statuses, 'whatsapp (estado)', t, (st) => updateStatus(t, st.id, (st.status === 'failed' ? 'failed' : st.status) as ChatMessage['status']));
@@ -182,7 +204,8 @@ async function handleWaValue(t: string, v: WaValue): Promise<void> {
     const id = await waSender(t, m);
     if (!id) return log.warn('Mensaje de WhatsApp sin remitente', { tenant: t, id: m.id });
     const { text, buttonId, isMedia } = readWaMessage(m);
-    await ingest(t, { channel: 'whatsapp', externalId: String(id), name: names.get(id), phone: m.from ? '+' + m.from : undefined, channelMessageId: m.id, text: text.slice(0, 4000), buttonId, isMedia });
+    const media = isMedia ? await waMediaFile(t, id, m) : {};
+    await ingest(t, { channel: 'whatsapp', externalId: String(id), name: names.get(id), phone: m.from ? '+' + m.from : undefined, channelMessageId: m.id, text: text.slice(0, 4000), buttonId, isMedia, mediaKind: isMedia ? m.type : undefined, ...media });
   });
 }
 

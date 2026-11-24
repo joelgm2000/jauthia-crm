@@ -2,6 +2,7 @@
  * Acciones del CRM (POST /api/action): un manejador tipado por acción.
  * Cada manejador recibe datos YA validados (schemas.ts) y solo toca datos del cliente activo.
  */
+import { deleteConversationFiles } from './inbox-files';
 import { agentMessagePatch, applyEdit, BOT_PAUSED_NOTE, botToggle, stageChange } from '../../shared/actions';
 import { ApiAction, ApiActions } from '../../shared/api';
 import { DEFAULT_FLOW, FlowConfig } from '../../shared/flow';
@@ -124,6 +125,7 @@ export const handlers: { [A in ApiAction]: Handler<A> } = {
   // ---------------- Administrador del cliente ----------------
   deleteConversation: async (d, { tenant }) => {
     await removeDoc(tenant.id, 'conversations', d.conversationId); // los mensajes se borran en cascada
+    await deleteConversationFiles(tenant.id, d.conversationId);
     return null;
   },
   saveProduct: async (d, { tenant }) => {

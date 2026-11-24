@@ -60,6 +60,9 @@ const mock = createServer((req, res) => {
     if (/^\d+\/subscribed_apps$/.test(path)) return send(res, 200, { success: true });
     if (/^\d+\/smb_app_data$/.test(path)) return send(res, 200, { request_id: 'req_' + body?.sync_type });
     if (/^\d+\/register$/.test(path)) return send(res, 200, { success: true });
+    // Archivos del cliente: primero la URL temporal, luego los bytes (con el mismo token).
+    if ((m = path.match(/^media_(img|pdf)$/))) return send(res, 200, { url: `http://localhost:3197/graph/dl/${m[1]}`, mime_type: m[1] === 'img' ? 'image/jpeg' : 'application/pdf', file_size: 12 });
+    if ((m = path.match(/^dl\/(img|pdf)$/))) return res.writeHead(200, { 'Content-Type': 'application/octet-stream' }).end(m[1] === 'img' ? Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]) : Buffer.from('%PDF-1.4 recibo'));
     if (/^\d+\/messages$/.test(path)) {
       if (body?.to === '573009999999') return send(res, 400, { error: { message: '(#131030) Recipient phone number not in allowed list', code: 131030 } });
       return send(res, 200, { messages: [{ id: 'wamid.' + randomBytes(6).toString('hex') }] });
@@ -165,6 +168,27 @@ await sleep(800);
 const after2 = await convs('adm');
 const joelMsgs2 = (await call(`/api/conversations/${joel.id}/messages`, { jar: 'adm' })).json.messages;
 check('Solo con el teléfono anotado: también cae en el chat de Joel', after2.length === before && joelMsgs2.some((x) => x.text === 'Solo con teléfono'), after2.map((c) => c.externalId));
+
+// Fotos y documentos (TecSolar: el cliente manda el recibo de luz en foto o PDF).
+await hook(change('messages', { messaging_product: 'whatsapp', metadata: meta222, contacts: [{ wa_id: '573005550000', profile: { name: 'Lucía' } }], messages: [
+  { from: '573005550000', id: 'wamid.img1', timestamp: '1795496500', type: 'image', image: { id: 'media_img', mime_type: 'image/jpeg' } },
+  { from: '573005550000', id: 'wamid.pdf1', timestamp: '1795496501', type: 'document', document: { id: 'media_pdf', mime_type: 'application/pdf', filename: 'Recibo Afinia octubre.pdf' } },
+] }));
+await sleep(1200);
+const luciaId = (await convs('adm')).find((c) => c.externalId === '573005550000').id;
+const cm = (await call(`/api/conversations/${luciaId}/messages`, { jar: 'adm' })).json.messages;
+const img = cm.find((x) => x.channelMessageId === 'wamid.img1');
+const pdf = cm.find((x) => x.channelMessageId === 'wamid.pdf1');
+check('La foto del cliente se descarga y se ve en el chat', img?.type === 'image' && /^\/api\/files\/[a-f0-9]{32}$/.test(img.imageUrl ?? ''), img);
+check('El PDF llega con su nombre y tipo', pdf?.file?.name === 'Recibo Afinia octubre.pdf' && pdf.file.mime === 'application/pdf' && pdf.file.size > 0, pdf);
+const fImg = await fetch(B + img.imageUrl, { headers: { Cookie: jars.adm } });
+check('El asesor la abre (misma imagen, protegida contra código)', fImg.status === 200 && fImg.headers.get('content-type') === 'image/jpeg' && fImg.headers.get('x-content-type-options') === 'nosniff' && (await fImg.arrayBuffer()).byteLength === 7);
+const fPdf = await fetch(B + pdf.file.url, { headers: { Cookie: jars.adm } });
+check('El PDF se abre en el navegador', fPdf.status === 200 && fPdf.headers.get('content-type') === 'application/pdf' && (await fPdf.text()).startsWith('%PDF'));
+check('Sin sesión no se puede ver', (await fetch(B + img.imageUrl)).status === 401);
+check('Otra empresa no puede verlo', (await fetch(B + img.imageUrl, { headers: { Cookie: jars.otra } })).status === 404);
+const dbRow = await call('/api/action', { method: 'POST', jar: 'adm', body: { action: 'deleteConversation', data: { conversationId: luciaId } } });
+check('Al borrar el chat se borran sus archivos', dbRow.status === 200 && (await fetch(B + img.imageUrl, { headers: { Cookie: jars.adm } })).status === 404);
 
 console.log('\nCoexistencia: lo que pasa en el celular');
 const sentBefore = seen.filter((x) => x.path === '2020202020202/messages').length;

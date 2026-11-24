@@ -25,6 +25,7 @@ import { mediaRouter } from './media';
 import { waConnectRouter } from './whatsapp-connect';
 import { actionSchemas, id } from './schemas';
 import { secretsStatus } from './secrets';
+import { serveInboxFile } from './inbox-files';
 
 // ---------------------------------------------------------------------------
 // Rutas /api (requieren sesión y cliente activo)
@@ -64,6 +65,8 @@ apiRouter.get('/bootstrap', async (req, res) => {
   };
   res.json(body);
 });
+
+apiRouter.get('/files/:id', serveInboxFile);
 
 apiRouter.get('/conversations/:id/messages', async (req, res) => {
   const p = id.safeParse(req.params['id']);
