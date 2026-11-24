@@ -35,11 +35,18 @@ export interface ConversationEdit {
   optIn?: boolean;
 }
 
+/** Código telefónico por país del BSUID de WhatsApp ("CO.123…") y dígitos de un celular local. */
+const COUNTRY_CODES: Record<string, string> = { CO: '57', MX: '52', PE: '51', EC: '593', VE: '58', PA: '507', CL: '56', AR: '54', US: '1', ES: '34' };
+const LOCAL_DIGITS: Record<string, number> = { '57': 10, '52': 10, '51': 9, '593': 9, '58': 10, '507': 8, '56': 9, '54': 10, '1': 10, '34': 9 };
+
 export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<Conversation> {
   const patch: Partial<Conversation> = {};
   if (edit.name !== undefined) patch.name = edit.name.trim().slice(0, 80) || conv.name;
   if (edit.phone !== undefined) {
-    const d = (edit.phone ?? '').replace(/\D/g, '');
+    let d = (edit.phone ?? '').replace(/\D/g, '');
+    // Escribieron el celular sin el código del país ("3187194560"): se toma del BSUID ("CO.188…" → +57).
+    const cc = COUNTRY_CODES[conv.externalId.split('.')[0]] ?? '';
+    if (cc && !(edit.phone ?? '').trim().startsWith('+') && d.length === LOCAL_DIGITS[cc] && !d.startsWith(cc)) d = cc + d;
     patch.phone = d.length >= 7 ? '+' + d : undefined;
   }
   if (edit.fields) {
