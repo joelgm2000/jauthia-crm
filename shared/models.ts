@@ -123,6 +123,12 @@ export interface ContactFields {
   cedula?: string;
   correo?: string;
   direccion?: string;
+  /** Energía solar: vivienda, empresa o finca. */
+  tipoPropiedad?: string;
+  /** Cuánto paga de luz al mes (o su consumo en kWh). */
+  gastoLuz?: string;
+  /** Recibo de luz: foto enviada, número NIC o "lo envía después". */
+  recibo?: string;
 }
 
 export interface QuickButton {

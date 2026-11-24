@@ -137,7 +137,7 @@ const flow = z.object({
     id: short(64), kind: z.enum(['question', 'recommend', 'handoff']), route: short(40), title: short(80), message: short(1024),
     display: z.enum(['buttons', 'list', 'text']).optional(), listButton: short(40).optional(), options: z.array(option).max(10).optional(),
     field: short(40).optional(), parse: z.enum(['name_city', 'city', 'number', 'choice', 'text']).optional(), next: short(64).optional(),
-    optionsFrom: z.enum(['categories']).optional(),
+    optionsFrom: z.enum(['categories']).optional(), prefill: z.boolean().optional(),
   })).max(80),
   triggers: z.array(z.object({
     id: short(64), label: short(120), intent: z.enum(TRIGGER_INTENTS), keywords: z.array(short(60)).max(80),

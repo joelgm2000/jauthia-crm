@@ -28,6 +28,9 @@ const LABELS: Record<(typeof EDITABLE_FIELDS)[number], Omit<FieldLabel, 'key'>> 
   cedula: { label: 'Cédula' },
   correo: { label: 'Correo' },
   direccion: { label: 'Dirección' },
+  tipoPropiedad: { label: 'Tipo de propiedad' },
+  gastoLuz: { label: 'Pago de luz al mes' },
+  recibo: { label: 'Recibo de luz / NIC' },
 };
 
 /** Campos del contacto en el orden en que se muestran (los mismos que el asesor puede editar). */

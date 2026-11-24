@@ -117,7 +117,7 @@ export interface SuperActions {
   listTenants: { req: Record<string, never>; res: { tenants: TenantSummary[] } };
   /** aiApiKey: clave de la IA de imágenes del cliente; se guarda cifrada y no se devuelve. "" la quita, ausente la deja igual. */
   /** socialKeys: token de Meta y clave de YouTube para las estadísticas reales; igual que aiApiKey ("" quita, ausente deja igual). */
-  saveTenant: { req: { tenant: Tenant; flowTemplate?: 'evosport' | 'generico'; sampleCatalog?: boolean; aiApiKey?: string; socialKeys?: { metaToken?: string; youtubeKey?: string } }; res: { tenant: Tenant } };
+  saveTenant: { req: { tenant: Tenant; flowTemplate?: import('./flow').FlowTemplateId; sampleCatalog?: boolean; aiApiKey?: string; socialKeys?: { metaToken?: string; youtubeKey?: string } }; res: { tenant: Tenant } };
   deleteTenant: { req: { id: string; confirmName: string }; res: void };
   listTenantUsers: { req: { tenantId: string }; res: { users: CrmUserInfo[] } };
   createTenantUser: { req: { tenantId: string; name: string; email: string; password: string; role: TenantRole }; res: { user: CrmUserInfo } };

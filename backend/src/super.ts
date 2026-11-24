@@ -10,6 +10,7 @@ import { Response, Router } from 'express';
 import { z } from 'zod';
 import { OWNER_ACTIONS, SuperAction, SuperActions, TenantSummary } from '../../shared/api';
 import { Tenant, TENANT_STATUSES } from '../../shared/models';
+import { FLOW_TEMPLATE_IDS } from '../../shared/flow';
 import { slugify } from '../../shared/text';
 import { ApiError, AuthUser, createUser, getTenant, listUsers, publicUser, requireAuth, requireCsrfHeader, requireSuperadmin, setSession } from './auth';
 import { invalidateCtx, publishTeam } from './core';
@@ -45,7 +46,7 @@ const tenant = z.object({
 const schemas: Record<SuperAction, z.ZodType> = {
   listTenants: z.object({}),
   saveTenant: z.object({
-    tenant, flowTemplate: z.enum(['evosport', 'generico']).optional(), sampleCatalog: z.boolean().optional(),
+    tenant, flowTemplate: z.enum(FLOW_TEMPLATE_IDS).optional(), sampleCatalog: z.boolean().optional(),
     aiApiKey: z.union([z.literal(''), z.string().trim().regex(/^[\w-]{20,200}$/, 'La clave API no tiene un formato válido')]).optional(),
     socialKeys: z.object({
       metaToken: z.union([z.literal(''), z.string().trim().regex(/^[\w|.-]{30,1000}$/, 'El token de Meta no tiene un formato válido')]).optional(),

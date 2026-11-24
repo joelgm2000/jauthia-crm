@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CrmUserInfo, PASSWORD_MIN, TenantSummary } from '@shared/api';
 import { Tenant, TenantStatus } from '@shared/models';
+import { FlowTemplateId } from '@shared/flow';
 import { AuthService } from '../../core/auth.service';
 import { CrmStore } from '../../core/data/crm-store';
 import { EMPTY_PROFILE, BusinessProfile } from '@shared/market';
@@ -52,7 +53,7 @@ export class SuperPanel implements OnInit {
   socialKey = { meta: '', youtube: '' };
   socialRemove = { meta: false, youtube: false };
   readonly isNew = signal(false);
-  flowTemplate: 'evosport' | 'generico' = 'generico';
+  flowTemplate: FlowTemplateId = 'generico';
   sampleCatalog = false;
   adminName = '';
   adminEmail = '';

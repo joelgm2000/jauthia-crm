@@ -69,6 +69,9 @@ export function buildSummary(conv: Conversation, products: Product[]): string {
     f.piso ? titleCase(f.piso) : '',
     f.usuarios ? `${f.usuarios} usuarios` : '',
     f.rangoKg ? `Rango ${f.rangoKg}` : '',
+    f.tipoPropiedad ? `Para ${f.tipoPropiedad}` : '',
+    f.gastoLuz ? `Paga de luz: ${f.gastoLuz}` : '',
+    f.recibo ? `Recibo: ${f.recibo}` : '',
     ...(conv.cart?.length
       ? [`Pedido: ${cartText(conv.cart)}`]
       : [f.cantidad ? `Cantidad: ${f.cantidad}` : '', model ? `Modelo: ${model}` : '']),
@@ -222,6 +225,8 @@ class Run {
       if (input.buttonId && !this.handleOptInButton(input.buttonId)) this.handleCitaButton(input.buttonId);
       return;
     }
+
+    if (!input.buttonId) this.prefill(norm);
 
     // 1) Botones de las tarjetas de producto y de las citas (válidos en cualquier punto del flujo).
     if (input.buttonId && (this.handleOptInButton(input.buttonId) || this.handleProductButton(input.buttonId) || this.handleCitaButton(input.buttonId))) return;
@@ -415,6 +420,19 @@ class Run {
     }
   }
 
+  /** Preguntas marcadas "prefill" que el cliente ya respondió sin que se las hicieran ("paneles para mi finca"). */
+  private prefill(norm: string): void {
+    const c = this.conv;
+    for (const n of this.flow.nodes) {
+      if (!n.prefill || n.kind !== 'question' || n.parse !== 'choice' || !n.field || n.field === 'nombre_ciudad') continue;
+      if (n.id === c.bot.nodeId || this.fieldFilled(n)) continue;
+      const opt = this.optionsOf(n).find((o) => o.value !== 'no-sabe' && (o.synonyms ?? []).some((s) => includesWord(norm, s)));
+      if (!opt) continue;
+      (c.fields as Record<string, unknown>)[n.field] = opt.value;
+      if (n.field === 'categoria' && !c.tags.includes(opt.value)) c.tags.push(opt.value);
+    }
+  }
+
   private node(id: string | undefined): FlowNode | undefined {
     // Las preguntas básicas por defecto (ciudad, cantidad) existen aunque un flujo antiguo no las tenga guardadas.
     return this.flow.nodes.find((n) => n.id === id) ?? DEFAULT_FLOW.nodes.find((n) => n.id === id && n.route === 'basicas');
@@ -533,8 +551,10 @@ class Run {
       if (city && name && !c.bot.nameGiven) ack = this.setName(name);
       this.setCity(city ?? titleCase(text.trim().replace(/^(?:de|desde|en)\s+/i, '').slice(0, 60)));
     } else {
-      if (norm.length < 1) return false;
-      if (node.field && node.field !== 'nombre_ciudad') (c.fields as Record<string, unknown>)[node.field] = text.trim();
+      if (norm.length < 1 && !input.isMedia) return false;
+      // Una foto (p. ej. el recibo de luz) también responde la pregunta: el asesor la ve en el chat.
+      const value = input.isMedia ? '📷 Envió una foto' : text.trim();
+      if (node.field && node.field !== 'nombre_ciudad') (c.fields as Record<string, unknown>)[node.field] = value;
     }
     this.scoreDelta += 3;
     // La cantidad es del producto del pedido que la estaba esperando (o del próximo que elija).

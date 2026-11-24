@@ -40,6 +40,8 @@ export interface FlowNode {
   parse?: ParseMode;
   /** Las opciones salen de las categorías del catálogo del cliente (en vez de escribirlas a mano). */
   optionsFrom?: 'categories';
+  /** Se responde sola si el cliente ya lo dijo antes ("quiero paneles para mi finca"): el bot no la pregunta. */
+  prefill?: boolean;
   next?: string;
 }
 
@@ -510,8 +512,145 @@ export const GENERIC_FLOW: FlowConfig = {
   },
 };
 
+/**
+ * Energía solar (TECSOLAR). Flujometría sacada de sus conversaciones reales de Kommo:
+ * el asesor siempre pide 1) vivienda, empresa o zona rural, 2) ubicación y 3) el recibo de luz (foto o NIC)
+ * para cotizar gratis. No hay catálogo de paneles: cada proyecto se cotiza a la medida; los reflectores sí
+ * tienen precio fijo y se muestran desde el catálogo (categoría "reflectores").
+ */
+export const SOLAR_FLOW: FlowConfig = {
+  version: 1,
+  startNode: 'saludo',
+  maxOptions: 3,
+  maxRetries: 2,
+  priorityKeywords: [],
+  nodes: [
+    {
+      id: 'saludo', kind: 'question', route: 'todas', title: 'Saludo',
+      message: '¡Hola! 👋 Soy {bot}, el asistente virtual de {empresa} ☀️. Te ayudo con tu cotización de energía solar, totalmente gratis. ¿Cómo te llamas y desde qué ciudad o municipio nos escribes?',
+      display: 'text', field: 'nombre_ciudad', parse: 'name_city', next: 'interes',
+    },
+    {
+      id: 'interes', kind: 'question', route: 'todas', title: 'Qué le interesa',
+      message: '¿Qué te gustaría cotizar? 👇',
+      display: 'buttons', field: 'categoria', parse: 'choice', prefill: true, next: 'propiedad',
+      options: [
+        { id: 'int_paneles', title: '☀️ Paneles solares', value: 'paneles', next: 'propiedad', synonyms: ['panel', 'paneles', 'energia solar', 'energía solar', 'sistema solar', 'fotovoltaico', 'plan separe', 'ahorrar', 'factura', 'cotizar', 'cotizacion', 'cotización', 'instalar', 'vivienda', 'casa', 'empresa', 'negocio', 'finca'] },
+        { id: 'int_reflectores', title: '💡 Reflectores', value: 'reflectores', next: 'recomendar', synonyms: ['reflector', 'reflectores', 'lampara', 'lámpara', 'iluminacion', 'iluminación'] },
+        { id: 'int_otro', title: '💬 Otra consulta', value: 'no-sabe', next: 'handoff', synonyms: ['otro', 'otra', 'ya soy cliente'] },
+      ],
+    },
+    {
+      id: 'propiedad', kind: 'question', route: 'paneles', title: 'Tipo de propiedad',
+      message: '¿El sistema sería para una vivienda, una empresa o una zona rural?',
+      display: 'buttons', field: 'tipoPropiedad', parse: 'choice', prefill: true, next: 'gasto',
+      options: [
+        { id: 'prop_vivienda', title: '🏠 Vivienda', value: 'vivienda', synonyms: ['vivienda', 'casa', 'hogar', 'apartamento', 'residencia'] },
+        { id: 'prop_empresa', title: '🏢 Empresa/negocio', value: 'empresa', synonyms: ['empresa', 'negocio', 'local', 'comercio', 'oficina', 'bodega', 'colegio', 'hotel', 'clinica', 'clínica'] },
+        { id: 'prop_rural', title: '🌾 Finca/zona rural', value: 'finca', synonyms: ['finca', 'rural', 'vereda', 'campo', 'parcela', 'hacienda'] },
+      ],
+    },
+    {
+      id: 'gasto', kind: 'question', route: 'paneles', title: 'Pago de luz al mes',
+      message: '¿Cuánto pagas de luz al mes, más o menos? Si lo sabes, también me sirve tu consumo en kWh.',
+      display: 'list', listButton: 'Ver rangos', field: 'gastoLuz', parse: 'text', next: 'recibo',
+      options: [
+        { id: 'gas_1', title: 'Menos de $300.000', value: 'menos de $300.000' },
+        { id: 'gas_2', title: '$300.000 a $600.000', value: '$300.000 a $600.000' },
+        { id: 'gas_3', title: '$600.000 a $1.000.000', value: '$600.000 a $1.000.000' },
+        { id: 'gas_4', title: 'Más de $1.000.000', value: 'más de $1.000.000' },
+        { id: 'gas_5', title: 'No sé', value: 'no sabe' },
+      ],
+    },
+    {
+      id: 'recibo', kind: 'question', route: 'paneles', title: 'Recibo de luz o NIC',
+      message: '📸 Para hacerte una cotización precisa, envíame una foto de tu recibo de luz (por delante y por detrás) o el número NIC de tu contrato. Si no lo tienes a mano, escribe *después*.',
+      display: 'text', field: 'recibo', parse: 'text', next: 'pago',
+    },
+    {
+      id: 'pago', kind: 'question', route: 'paneles', title: 'Forma de pago',
+      message: '¿Cómo te gustaría pagar tu sistema?',
+      display: 'buttons', field: 'formaPago', parse: 'choice', next: 'handoff',
+      options: [
+        { id: 'pag_contado', title: 'De contado', value: 'contado', synonyms: ['contado', 'efectivo', 'de una'] },
+        { id: 'pag_cuotas', title: 'Financiado', value: 'financiado', synonyms: ['financiado', 'financiar', 'financiacion', 'financiación', 'credito', 'crédito', 'cuotas', 'cesantias', 'cesantías', 'banco'] },
+        { id: 'pag_separe', title: 'Plan Separe', value: 'plan separe', synonyms: ['plan separe', 'separe', 'separar', 'apartar'] },
+      ],
+    },
+    {
+      id: 'recomendar', kind: 'recommend', route: 'reflectores', title: 'Reflectores (1 a 3 opciones)',
+      message: 'Estos son nuestros reflectores solares 👇 Funcionan con energía solar y se encienden solos en la noche.',
+    },
+    {
+      id: 'handoff', kind: 'handoff', route: 'todas', title: 'Traspaso al asesor',
+      message: '¡Listo! 🙌 Ya tengo lo necesario. Un asesor de {empresa} revisa tu consumo y te envía tu cotización gratis y sin compromiso.',
+    },
+  ],
+  triggers: [
+    { id: 't_precio', label: 'Pregunta el precio', intent: 'precio', handoff: false, score: 15, keywords: ['precio', 'cuanto vale', 'cuánto vale', 'cuanto cuesta', 'cuánto cuesta', 'valor', 'cuanto sale', 'cuánto sale'] },
+    { id: 't_compra', label: 'Quiere contratar o pagar', intent: 'compra', handoff: true, score: 35, moveTo: 'negociacion', keywords: ['contratar', 'firmar el contrato', 'hagamos el negocio', 'como pago', 'cómo pago'] },
+    { id: 't_pago', label: 'Envía comprobante de pago', intent: 'pago', handoff: true, score: 50, moveTo: 'pago', keywords: ['comprobante', 'ya pague', 'ya pagué', 'ya transferi', 'ya transferí', 'consignacion', 'consignación'] },
+    { id: 't_soporte', label: 'Garantía o falla de su sistema', intent: 'soporte', handoff: true, score: 10, keywords: ['garantia', 'garantía', 'falla', 'dano', 'daño', 'no funciona', 'no prende', 'reparacion', 'reparación', 'ya soy cliente'] },
+    { id: 't_humano', label: 'Pide una persona, una llamada o la visita', intent: 'humano', handoff: true, score: 5, keywords: ['asesor', 'asesora', 'humano', 'persona', 'hablar con alguien', 'llamar', 'llamada', 'llamen', 'llamenme', 'llámenme', 'agendar visita', 'agendar la visita'] },
+  ],
+  followUps: [
+    { afterHours: 2, message: '{nombre}, ¿pudiste buscar tu recibo de luz? 📸 Con una foto (o el NIC) te hacemos la cotización gratis.' },
+    { afterHours: 20, message: 'Hola {nombre} ☀️ Lo que hoy pagas de luz puede convertirse en tu inversión. ¿Seguimos con tu cotización gratis? Solo envíanos la foto del recibo o el NIC.' },
+    { afterHours: 72, message: 'Última consulta, {nombre}: ¿aún te interesa tu sistema solar? Si prefieres, un asesor te llama para resolver tus dudas.' },
+  ],
+  remarketing: { enabled: true, stages: ['calificando', 'asesor', 'cotizacion', 'negociacion'], withAdvisor: true, loseAfterHours: 72 },
+  persona: {
+    botName: 'Sol',
+    role: 'asistente virtual de energía solar',
+    tone: 'cercano',
+    objective: 'Conseguir los datos que el asesor necesita para cotizar gratis un sistema de energía solar (tipo de propiedad, ubicación, cuánto paga de luz y el recibo o el NIC) y pasar al cliente con un asesor con todo listo.',
+    rules: [
+      'Nunca des precios de proyectos: dependen del consumo y los envía el asesor en la cotización.',
+      'Haz una sola pregunta por mensaje y espera la respuesta.',
+      'Pide siempre la foto del recibo de luz (por delante y por detrás) o el NIC: es lo que permite cotizar.',
+      'Nunca pidas la cédula ni datos de tarjetas por chat.',
+      'No prometas porcentajes de ahorro, tiempos ni equipos que no confirme el asesor.',
+      'Si pide una llamada, una visita técnica o tiene una falla en su sistema, pásalo de inmediato al asesor.',
+    ],
+    prompt: '',
+  },
+  required: [
+    { key: 'nombre', label: 'Nombre', when: 'inicio', nodeId: 'saludo' },
+    { key: 'ciudad', label: 'Ciudad', when: 'inicio', nodeId: 'pedir_ciudad' },
+  ],
+  faqs: [
+    { id: 'faq_precio', keywords: ['precio', 'cuanto vale', 'cuánto vale', 'cuanto cuesta', 'cuánto cuesta', 'cuanto sale', 'cuánto sale', 'costo'], answer: '💡 El valor depende de tu consumo de energía: por eso te pedimos el recibo de luz. Con él, un asesor te envía la cotización gratis y sin compromiso.' },
+    { id: 'faq_separe', keywords: ['plan separe'], answer: '📌 Con el *Plan Separe* apartas tu proyecto con el 10% del valor y empezamos el trámite ante el operador de red. Luego completas hasta el 60% en 4 meses para iniciar la construcción, y el 40% final lo pagas en cuotas sin intereses.' },
+    { id: 'faq_pago', keywords: ['financiacion', 'financiación', 'financian', 'financiamiento', 'credito', 'crédito', 'formas de pago', 'forma de pago', 'cuota inicial', 'cesantias', 'cesantías'], answer: '💳 Tienes varias opciones: pagar el 50% al firmar y el resto en cuotas sin intereses con nosotros, apartar tu proyecto con el *Plan Separe* (desde el 10%), o financiarlo con tu banco o con tus cesantías. El asesor te explica cuál te conviene.' },
+    { id: 'faq_tramites', keywords: ['operador de red', 'afinia', 'tramite', 'trámite', 'tramites', 'trámites', 'permisos', 'contador', 'medidor', 'retie'], answer: '📄 Nosotros nos encargamos de los trámites ante el operador de red. El cambio de medidor y la certificación toman normalmente de 3 a 6 meses.' },
+    { id: 'faq_mantenimiento', keywords: ['mantenimiento', 'mantenimientos'], answer: '🔧 Te obsequiamos el primer mantenimiento preventivo anual de tu sistema.' },
+    { id: 'faq_baterias', keywords: ['bateria', 'batería', 'baterias', 'baterías', 'hibrido', 'híbrido', 'aislado'], answer: '🔋 Normalmente recomendamos un sistema interconectado a la red para toda la casa, porque los sistemas con baterías (híbridos o aislados) cuestan bastante más. Si necesitas baterías, el asesor te cotiza las dos opciones.' },
+    { id: 'faq_visita', keywords: ['visita tecnica', 'visita técnica', 'sin compromiso'], answer: '🏠 La cotización es gratis y sin compromiso. En la visita técnica revisamos tu techo y tu instalación para ajustar la propuesta.' },
+  ],
+  messages: {
+    greeting: '¡Hola! 👋 Soy {bot}, el asistente virtual de {empresa} ☀️.',
+    nameAck: 'Mucho gusto, {nombre} 😊',
+    backToFlow: 'Ahora sí, sigamos 😊',
+    handoff: '¡Listo! 🙌 Ya le pasé tus datos a un asesor de {empresa}: te escribe en breve. Recuerda que la cotización es gratis y sin compromiso.',
+    askNameAgain: 'Para ayudarte con tu cotización, ¿cómo te llamas y desde qué ciudad o municipio nos escribes?',
+    handoffHuman: 'Con gusto 😊 Un asesor de {empresa} te contacta en breve.',
+    handoffSupport: 'Entiendo. Le paso tu caso a un asesor de {empresa} para que te ayude de inmediato.',
+    showOthers: 'Claro, te muestro otras opciones.',
+    noMoreOptions: 'Ya te mostré todas las opciones que tengo. Te paso con un asesor.',
+    noneLiked: 'Entiendo 😊. Cuéntame qué buscas exactamente y te ayudo, o le pido a un asesor que te contacte.',
+    notUnderstood: 'Perdona, no te entendí bien. ¿Me lo puedes decir de otra forma o elegir una opción?',
+    productIntro: '¡Claro! Mira lo que tenemos 👇',
+    detailsCta: '¿Te gusta esta opción?',
+    noPrices: 'El valor depende de tu consumo de energía: un asesor te envía la cotización gratis.',
+    askProduct: '¡Con gusto te ayudo! 😊 ¿Qué te gustaría cotizar?',
+  },
+};
+
 /** Plantillas de flujo que se pueden asignar al crear un cliente. */
-export const FLOW_TEMPLATES: Record<'evosport' | 'generico', { name: string; flow: FlowConfig }> = {
+export const FLOW_TEMPLATES = {
   evosport: { name: 'Gimnasio / máquinas (EvoSport)', flow: DEFAULT_FLOW },
   generico: { name: 'Genérico (cualquier negocio)', flow: GENERIC_FLOW },
-};
+  solar: { name: 'Energía solar (TECSOLAR)', flow: SOLAR_FLOW },
+} satisfies Record<string, { name: string; flow: FlowConfig }>;
+export type FlowTemplateId = keyof typeof FLOW_TEMPLATES;
+export const FLOW_TEMPLATE_IDS = Object.keys(FLOW_TEMPLATES) as [FlowTemplateId, ...FlowTemplateId[]];
