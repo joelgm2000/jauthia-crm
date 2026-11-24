@@ -66,7 +66,10 @@ async function validMetaSignature(req: Request, channel: ChannelType): Promise<b
   if (!secret) return !config.isProd; // solo para pruebas locales
   const sig = req.get('x-hub-signature-256') ?? '';
   const expected = 'sha256=' + createHmac('sha256', secret).update(req.rawBody ?? Buffer.alloc(0)).digest('hex');
-  return safeEqual(sig, expected);
+  const ok = safeEqual(sig, expected);
+  // Sin esto un webhook rechazado no deja rastro (Meta solo ve un 401). Nunca se registran la firma ni la clave.
+  if (!ok) log.warn('Webhook rechazado: la firma no coincide con la clave secreta de la app guardada en Canales', { tenant: req.hookTenant!.id, channel, conFirma: !!sig, bytes: req.rawBody?.length ?? 0 });
+  return ok;
 }
 
 function verifyChallenge(channel: ChannelType) {
