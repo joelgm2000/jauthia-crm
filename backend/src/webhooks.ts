@@ -152,6 +152,25 @@ webhooksRouter.post('/:tenantId/whatsapp', tenantParam, async (req, res) => {
   }
 });
 
+/**
+ * Id del cliente en WhatsApp. Meta puede mandar su teléfono, su BSUID o los dos (según tenga nombre de usuario
+ * y según el negocio ya conozca su número). Para no partir la conversación en dos, se usa el id del chat que ya
+ * exista; si es nuevo, el BSUID (estable para el negocio) o, si no hay, el teléfono.
+ */
+async function waSender(t: string, m: WaMessage): Promise<string | undefined> {
+  const ids = [m.from_user_id, m.from].filter((x): x is string => !!x);
+  for (const id of ids) if (await getDoc(t, 'conversations', conversationId('whatsapp', id))) return id;
+  // El asesor anotó ese teléfono en el chat de alguien que escribió con nombre de usuario: es la misma persona.
+  if (m.from) {
+    const r = await pool.query(
+      `SELECT data->>'externalId' AS ext FROM conversations WHERE tenant_id = $1 AND data->>'channel' = 'whatsapp' AND data->>'phone' = $2 ORDER BY updated_at DESC LIMIT 1`,
+      [t, '+' + m.from],
+    );
+    if (r.rows[0]?.ext) return String(r.rows[0].ext);
+  }
+  return ids[0];
+}
+
 /** Estados y mensajes entrantes de WhatsApp de un cliente. */
 async function handleWaValue(t: string, v: WaValue): Promise<void> {
   await each(v.statuses, 'whatsapp (estado)', t, (st) => updateStatus(t, st.id, (st.status === 'failed' ? 'failed' : st.status) as ChatMessage['status']));
@@ -159,7 +178,8 @@ async function handleWaValue(t: string, v: WaValue): Promise<void> {
   for (const c of v.contacts ?? []) for (const k of [c.wa_id, c.user_id]) if (k) names.set(k, c.profile?.name);
   await each(v.messages, 'whatsapp', t, async (m) => {
     // Con nombre de usuario de WhatsApp, Meta no manda el teléfono: el cliente se identifica con su BSUID.
-    const id = m.from ?? m.from_user_id;
+    // Si ya conocemos su teléfono, llegan los dos: se usa el chat que ya exista con cualquiera de ellos (un solo chat por cliente).
+    const id = await waSender(t, m);
     if (!id) return log.warn('Mensaje de WhatsApp sin remitente', { tenant: t, id: m.id });
     const { text, buttonId, isMedia } = readWaMessage(m);
     await ingest(t, { channel: 'whatsapp', externalId: String(id), name: names.get(id), phone: m.from ? '+' + m.from : undefined, channelMessageId: m.id, text: text.slice(0, 4000), buttonId, isMedia });

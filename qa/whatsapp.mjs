@@ -149,6 +149,23 @@ const last = seen.filter((x) => x.path === '2020202020202/messages' && x.body?.t
 check('Con el teléfono anotado se le responde a ese número ("to")', r9.status === 200 && last?.body?.to === '573187194560' && last.body.recipient === undefined, JSON.stringify([r9.status, r9.text.slice(0,200), last?.body]));
 check('Teléfono inválido: 400', (await call('/api/action', { method: 'POST', jar: 'adm', body: { action: 'editConversation', data: { conversationId: joel.id, edit: { phone: '<script>' } } } })).status === 400);
 
+// Ya conocemos su teléfono: Meta manda los dos (teléfono y BSUID). Todo sigue en el mismo chat (así se partió el 23-nov).
+const before = (await convs('adm')).length;
+await hook(change('messages', { messaging_product: 'whatsapp', metadata: meta222, contacts: [{ profile: { username: 'joelgm_co' }, wa_id: '573187194560', user_id: BSUID }], messages: [{ from: '573187194560', from_user_id: BSUID, id: 'wamid.both1', timestamp: '1795496300', type: 'text', text: { body: 'Ver detalles' } }] }));
+// Cliente de siempre (chat por teléfono) que ahora también llega con BSUID: sigue en su chat.
+await hook(change('messages', { messaging_product: 'whatsapp', metadata: meta222, contacts: [{ wa_id: '573001112233', user_id: 'CO.999', profile: { name: 'Carlos' } }], messages: [{ from: '573001112233', from_user_id: 'CO.999', id: 'wamid.both2', timestamp: '1795496301', type: 'text', text: { body: 'Sigo aquí' } }] }));
+await sleep(800);
+const after = await convs('adm');
+check('Teléfono + BSUID: no se parte la conversación (ni la de Joel ni la de Carlos)', after.length === before && !after.some((c) => c.externalId === '573187194560' || c.externalId === 'CO.999'), after.map((c) => c.externalId));
+const joelMsgs = (await call(`/api/conversations/${joel.id}/messages`, { jar: 'adm' })).json.messages;
+check('El mensaje queda en el chat de Joel y el bot no vuelve a saludar', joelMsgs.some((x) => x.text === 'Ver detalles') && !joelMsgs.slice(-3).some((x) => x.sender === 'bot' && x.text.includes('Soy Sofía')), joelMsgs.slice(-3).map((x) => x.text));
+// Llega solo con el teléfono que el asesor anotó (sin BSUID): también es Joel.
+await hook(change('messages', { messaging_product: 'whatsapp', metadata: meta222, contacts: [{ wa_id: '573187194560', profile: { name: 'Joel García' } }], messages: [{ from: '573187194560', id: 'wamid.phoneonly1', timestamp: '1795496400', type: 'text', text: { body: 'Solo con teléfono' } }] }));
+await sleep(800);
+const after2 = await convs('adm');
+const joelMsgs2 = (await call(`/api/conversations/${joel.id}/messages`, { jar: 'adm' })).json.messages;
+check('Solo con el teléfono anotado: también cae en el chat de Joel', after2.length === before && joelMsgs2.some((x) => x.text === 'Solo con teléfono'), after2.map((c) => c.externalId));
+
 console.log('\nCoexistencia: lo que pasa en el celular');
 const sentBefore = seen.filter((x) => x.path === '2020202020202/messages').length;
 await hook(change('smb_message_echoes', { messaging_product: 'whatsapp', metadata: meta222, message_echoes: [{ from: '573000000001', to: '573001112233', id: 'wamid.echo1', timestamp: '1793000100', type: 'text', text: { body: 'Hola Carlos, te atiendo yo 😊' } }] }));
