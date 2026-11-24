@@ -5,6 +5,11 @@
       <div class="row">
         <h2>Bandeja</h2>
         <span class="spacer"></span>
+        @if (waConnected()) {
+          <button class="btn sm" (click)="openNewChat()" title="Escribirle por WhatsApp a un cliente que aún no tiene chat">
+            <app-icon name="plus" [size]="13" /> Nuevo chat
+          </button>
+        }
         <button class="btn sm primary" (click)="showNewTest.set(true)" title="Crear una conversación de prueba y chatear como si fueras el cliente">
           <app-icon name="play" [size]="13" /> Probar bot
         </button>
@@ -294,6 +299,41 @@
 }
 @if (showTemplates()) {
   <app-template-picker [templates]="store.templates()" [products]="store.products()" [companyName]="store.settings().companyName" (close)="showTemplates.set(false)" (send)="sendTemplate($event)" />
+}
+@if (showNewChat()) {
+  <div class="overlay" (click)="showNewChat.set(false)">
+    <div class="modal" style="max-width:480px" (click)="$event.stopPropagation()">
+      <div class="modal-head"><app-channel-icon channel="whatsapp" [size]="18" /> <h2>Nuevo chat de WhatsApp</h2><span class="spacer"></span><button class="btn ghost icon-only sm" (click)="showNewChat.set(false)"><app-icon name="x" /></button></div>
+      <div class="modal-body">
+        <p class="muted" style="margin:0">Para escribirle primero a un cliente, WhatsApp exige una <b>plantilla aprobada por Meta</b> y que el cliente haya dado permiso. Cuando responda, el chat sigue normal en la Bandeja.</p>
+        <div class="field">
+          <label>Número de WhatsApp</label>
+          <input class="input" inputmode="tel" placeholder="+57 300 123 4567" [ngModel]="ncPhone()" (ngModelChange)="ncPhone.set($event)" />
+          <small class="muted">Con el código del país. Si es de Colombia puedes escribir solo los 10 dígitos.</small>
+        </div>
+        <div class="field">
+          <label>Nombre (opcional)</label>
+          <input class="input" placeholder="Nombre del cliente" [ngModel]="ncName()" (ngModelChange)="ncName.set($event)" />
+        </div>
+        <div class="field">
+          <label>Plantilla</label>
+          @if (approvedTemplates().length) {
+            <select class="select" [ngModel]="ncTemplate()" (ngModelChange)="ncTemplate.set($event)">
+              @for (t of approvedTemplates(); track t.id) { <option [value]="t.id">{{ t.name }} · {{ t.category === 'MARKETING' ? 'Marketing' : 'Servicio' }}</option> }
+            </select>
+            @if (ncPreview(); as pv) { <div class="nc-preview">{{ pv }}</div> }
+          } @else {
+            <div class="nc-empty">No hay plantillas aprobadas por Meta. Créalas en <a routerLink="/templates">Plantillas WhatsApp</a> y espera la aprobación.</div>
+          }
+        </div>
+        <label class="row nc-consent"><input type="checkbox" [ngModel]="ncConsent()" (ngModelChange)="ncConsent.set($event)" /> El cliente autorizó que {{ store.settings().companyName || 'la empresa' }} le escriba por WhatsApp.</label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" (click)="showNewChat.set(false)">Cancelar</button>
+        <button class="btn primary" [disabled]="!ncPhone().trim() || !ncTemplate() || !ncConsent() || ncSending()" (click)="startChat()"><app-icon name="send" [size]="14" /> {{ ncSending() ? 'Enviando…' : 'Enviar' }}</button>
+      </div>
+    </div>
+  </div>
 }
 @if (showNewTest()) {
   <div class="overlay" (click)="showNewTest.set(false)">

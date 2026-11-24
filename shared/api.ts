@@ -58,6 +58,8 @@ export interface ApiActions {
   toggleBot: { req: { conversationId: string }; res: void };
   editConversation: { req: { conversationId: string; edit: ConversationEdit }; res: void };
   createTestConversation: { req: { channel: ChannelType; name?: string }; res: { conversation: Conversation } };
+  /** Nuevo chat de WhatsApp iniciado por el asesor: plantilla aprobada a un número que dio su permiso. */
+  startConversation: { req: { phone: string; name?: string; templateId: string; consent: true }; res: { conversationId: string } };
   simulateIncoming: { req: { conversationId: string; text?: string; buttonId?: string; title?: string }; res: void };
   saveTask: { req: { task: CrmTask }; res: void };
   toggleTask: { req: { id: string }; res: void };

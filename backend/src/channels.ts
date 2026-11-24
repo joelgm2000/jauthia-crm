@@ -79,7 +79,7 @@ export function waPayloads(m: ChatMessage, base?: string): object[] {
       ...(headerImage ? [{ type: 'header', parameters: [{ type: 'image', image: { link: headerImage } }] }] : []),
       ...(m.templateParams?.length ? [{ type: 'body', parameters: m.templateParams.map((t) => ({ type: 'text', text: t })) }] : []),
     ];
-    return [{ type: 'template', template: { name: m.templateName, language: { code: 'es' }, components } }];
+    return [{ type: 'template', template: { name: m.templateName, language: { code: m.templateLanguage || 'es' }, components } }];
   }
 
   // WhatsApp no tiene carrusel libre en mensajes de sesión: cada producto va como

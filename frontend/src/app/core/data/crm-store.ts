@@ -195,6 +195,12 @@ export class CrmStore {
     return this.source.listenMessages(id, cb);
   }
 
+  /** Nuevo chat de WhatsApp iniciado por el asesor (plantilla aprobada a un número con permiso). */
+  async startConversation(phone: string, name: string, templateId: string): Promise<string> {
+    const { conversationId } = await this.call('startConversation', { phone, name: name || undefined, templateId, consent: true });
+    return conversationId;
+  }
+
   async createTestConversation(channel: ChannelType, name: string): Promise<Conversation> {
     const { conversation } = await this.call('createTestConversation', { channel, name });
     this.conversations.update((list) => (list.some((c) => c.id === conversation.id) ? list : [...list, conversation]));

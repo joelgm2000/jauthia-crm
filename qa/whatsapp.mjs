@@ -190,6 +190,26 @@ check('Otra empresa no puede verlo', (await fetch(B + img.imageUrl, { headers: {
 const dbRow = await call('/api/action', { method: 'POST', jar: 'adm', body: { action: 'deleteConversation', data: { conversationId: luciaId } } });
 check('Al borrar el chat se borran sus archivos', dbRow.status === 200 && (await fetch(B + img.imageUrl, { headers: { Cookie: jars.adm } })).status === 404);
 
+// Nuevo chat: el asesor le escribe primero a un número (plantilla aprobada + permiso del cliente).
+const act2 = (action, data) => call('/api/action', { method: 'POST', jar: 'adm', body: { action, data } });
+await act2('saveTemplate', { template: { id: 'tpl_bienvenida', name: 'bienvenida', category: 'UTILITY', kind: 'text', language: 'es_CO', body: 'Hola {{1}}, te escribe el equipo. ¿Seguimos con tu pedido?', buttons: [], status: 'APPROVED' } });
+await act2('saveTemplate', { template: { id: 'tpl_borrador', name: 'borrador', category: 'UTILITY', kind: 'text', language: 'es', body: 'Hola', buttons: [], status: 'PENDING' } });
+let nc = await act2('startConversation', { phone: '300 555 1234', name: 'Marta Ruiz', templateId: 'tpl_bienvenida', consent: true });
+await sleep(800);
+const ncSent = seen.filter((x) => x.path === '2020202020202/messages' && x.body?.to === '573005551234').at(-1);
+check('Nuevo chat: crea el chat con +57 y envía la plantilla aprobada', nc.status === 200 && nc.json.result.conversationId === 'whatsapp_573005551234' && ncSent?.body?.template?.name === 'bienvenida', [nc.text, ncSent?.body]);
+check('Usa el idioma de la plantilla y el nombre del cliente', ncSent?.body?.template?.language?.code === 'es_CO' && ncSent.body.template.components?.[0]?.parameters?.[0]?.text === 'Marta', ncSent?.body);
+const marta = (await convs('adm')).find((c) => c.id === 'whatsapp_573005551234');
+check('Queda con el permiso registrado y el bot en pausa (lo atiende el asesor)', !!marta?.optInAt && marta.tags.includes('acepta-promociones') && marta.botActive === false, marta);
+check('Sin confirmar el permiso del cliente: 400', (await act2('startConversation', { phone: '3005551235', templateId: 'tpl_bienvenida', consent: false })).status === 400);
+check('Plantilla no aprobada: 400', (await act2('startConversation', { phone: '3005551235', templateId: 'tpl_borrador', consent: true })).status === 400);
+check('Número inválido: 400', (await act2('startConversation', { phone: '12', templateId: 'tpl_bienvenida', consent: true })).status === 400);
+nc = await act2('startConversation', { phone: '+57 300 555 1234', templateId: 'tpl_bienvenida', consent: true });
+check('Si ya existe el chat, se usa el mismo', nc.status === 200 && nc.json.result.conversationId === 'whatsapp_573005551234' && (await convs('adm')).filter((c) => c.externalId === '573005551234').length === 1);
+await hook(change('messages', { messaging_product: 'whatsapp', metadata: meta222, contacts: [{ wa_id: '573005551234', profile: { name: 'Marta' } }], messages: [{ from: '573005551234', id: 'wamid.stopm', timestamp: '1795496600', type: 'text', text: { body: 'STOP' } }] }));
+await sleep(800);
+check('A quien pidió la baja no se le puede escribir primero: 409', (await act2('startConversation', { phone: '3005551234', templateId: 'tpl_bienvenida', consent: true })).status === 409);
+
 console.log('\nCoexistencia: lo que pasa en el celular');
 const sentBefore = seen.filter((x) => x.path === '2020202020202/messages').length;
 await hook(change('smb_message_echoes', { messaging_product: 'whatsapp', metadata: meta222, message_echoes: [{ from: '573000000001', to: '573001112233', id: 'wamid.echo1', timestamp: '1793000100', type: 'text', text: { body: 'Hola Carlos, te atiendo yo 😊' } }] }));

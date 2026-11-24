@@ -146,3 +146,9 @@
 .suggest details .btn { margin-top: 4px; }
 .optout { border-color: #fecaca; background: #fef2f2; }
 :root[data-theme='dark'] .optout { background: #2a1111; border-color: #5a1f1f; }
+
+/* Nuevo chat */
+.nc-preview { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: #dcf8c6; color: #111; white-space: pre-wrap; font-size: 13px; }
+.nc-empty { padding: 10px 12px; border-radius: 10px; background: var(--hover); font-size: 13px; }
+.nc-consent { gap: 8px; align-items: flex-start; font-size: 13px; }
+.nc-consent input { margin-top: 3px; }

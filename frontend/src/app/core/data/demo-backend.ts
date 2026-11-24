@@ -186,5 +186,8 @@ export class DemoBackend implements CrmBackend {
     deleteUser: async () => {
       throw new Error('En modo demo no se pueden eliminar usuarios');
     },
+    startConversation: async () => {
+      throw new Error('En modo demo no se pueden iniciar chats reales de WhatsApp');
+    },
   };
 }

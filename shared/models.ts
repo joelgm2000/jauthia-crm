@@ -191,6 +191,8 @@ export interface ChatMessage {
   /** Plantilla aprobada de Meta: se envía como template (sirve fuera de la ventana de 24 h). */
   templateName?: string;
   templateParams?: string[];
+  /** Idioma con que Meta aprobó la plantilla (es, es_CO, en_US…). */
+  templateLanguage?: string;
   /** Inbound: ya lo procesó el motor del bot. */
   processed?: boolean;
   authorName?: string;

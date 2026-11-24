@@ -85,6 +85,23 @@ export class Inbox {
   readonly testChannel = signal<ChannelType>('whatsapp');
   readonly testName = signal('');
 
+  // ---- Nuevo chat de WhatsApp (el asesor escribe primero con una plantilla aprobada) ----
+  readonly showNewChat = signal(false);
+  readonly ncPhone = signal('');
+  readonly ncName = signal('');
+  readonly ncTemplate = signal('');
+  readonly ncConsent = signal(false);
+  readonly ncSending = signal(false);
+  readonly waConnected = computed(() => !!this.store.channels().find((c) => c.id === 'whatsapp')?.connected);
+  readonly approvedTemplates = computed(() => this.store.templates().filter((t) => t.status === 'APPROVED'));
+  /** Cómo le llegará el mensaje (con el nombre que escribió el asesor). */
+  readonly ncPreview = computed(() => {
+    const t = this.approvedTemplates().find((x) => x.id === this.ncTemplate());
+    if (!t) return '';
+    const [d] = templateDrafts(t, this.store.products(), { nombre: this.ncName().trim().split(' ')[0], producto: '', empresa: this.store.settings().companyName }, true);
+    return d.text;
+  });
+
   private scroller = viewChild<ElementRef<HTMLDivElement>>('scroller');
   private box = viewChild<ElementRef<HTMLTextAreaElement>>('box');
 
@@ -351,6 +368,30 @@ export class Inbox {
       assignedTo: c.assignedTo ?? null,
       createdAt: Date.now(),
     });
+  }
+
+  openNewChat(): void {
+    this.ncPhone.set('');
+    this.ncName.set('');
+    this.ncConsent.set(false);
+    this.ncTemplate.set(this.approvedTemplates()[0]?.id ?? '');
+    this.showNewChat.set(true);
+  }
+
+  async startChat(): Promise<void> {
+    if (this.ncSending()) return;
+    this.ncSending.set(true);
+    try {
+      const id = await this.store.startConversation(this.ncPhone().trim(), this.ncName().trim(), this.ncTemplate());
+      this.showNewChat.set(false);
+      this.filter.set('todas');
+      this.channelFilter.set('all');
+      await this.router.navigate(['/inbox', id]);
+    } catch {
+      // el error ya se mostró como aviso
+    } finally {
+      this.ncSending.set(false);
+    }
   }
 
   async createTest(): Promise<void> {

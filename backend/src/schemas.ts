@@ -56,6 +56,7 @@ const draft = z.object({
   cards: z.array(card).max(10).optional(),
   templateName: z.string().max(120).regex(/^[a-z0-9_]+$/).optional(),
   templateParams: z.array(short(500)).max(10).optional(),
+  templateLanguage: z.string().max(12).regex(/^[a-z]{2,3}(_[A-Z]{2})?$/).optional(),
 });
 
 const fieldsShape = Object.fromEntries(EDITABLE_FIELDS.map((k) => [k, z.union([z.string().max(300), z.number()]).optional().nullable()]));
@@ -180,6 +181,7 @@ export const actionSchemas: Record<ApiAction, z.ZodType> = {
   toggleBot: z.object({ conversationId: id }),
   editConversation: z.object({ conversationId: id, edit }),
   createTestConversation: z.object({ channel: channelType, name: short(80).optional() }),
+  startConversation: z.object({ phone: z.string().min(7).max(25).regex(/^[+\d\s().-]+$/), name: short(80).optional(), templateId: short(64), consent: z.literal(true) }),
   simulateIncoming: z.object({ conversationId: id, text: short(2000).optional(), buttonId: short(200).optional(), title: short(80).optional() }),
   saveTask: z.object({ task }),
   toggleTask: z.object({ id }),

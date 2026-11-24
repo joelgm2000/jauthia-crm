@@ -6,13 +6,15 @@ import { deleteConversationFiles } from './inbox-files';
 import { agentMessagePatch, applyEdit, BOT_PAUSED_NOTE, botToggle, stageChange } from '../../shared/actions';
 import { ApiAction, ApiActions } from '../../shared/api';
 import { DEFAULT_FLOW, FlowConfig } from '../../shared/flow';
-import { newTestConversation, noteMessage, outboundMessage } from '../../shared/messages';
+import { conversationId, newConversation, newTestConversation, noteMessage, outboundMessage } from '../../shared/messages';
 import { ChannelConfig, Conversation, CrmTask, Product, Tenant, WaTemplate } from '../../shared/models';
 import { SEED_PRODUCTS } from '../../shared/seed';
+import { OPT_IN_TAG } from '../../shared/optout';
+import { templateDrafts } from '../../shared/templates';
 import { ApiError, AuthUser, createUser, deleteUser, listUsers, publicUser, updateUser } from './auth';
 import { testChannelConnection } from './channel-setup';
 import { ingest, invalidateCtx, loadCtx, notifyStageChange, publishTeam } from './core';
-import { getDoc, getSetting, insertMessage, patchDoc, putDoc, putSetting, removeDoc, txEmit } from './db';
+import { getDoc, getSetting, insertMessage, patchDoc, pool, putDoc, putSetting, removeDoc, txEmit } from './db';
 import { log } from './log';
 import { SECRET_FIELDS, saveSecrets, secretsStatus } from './secrets';
 
@@ -90,6 +92,41 @@ export const handlers: { [A in ApiAction]: Handler<A> } = {
     const patch = applyEdit(conv, d.edit);
     if (Object.keys(patch).length) await patchDoc(tenant.id, 'conversations', conv.id, patch);
     return null;
+  },
+
+  startConversation: async (d, args) => {
+    const { tenant, user, now } = args;
+    const ctx = await loadCtx(tenant.id);
+    if (!ctx.channels.get('whatsapp')?.connected) throw new ApiError(409, 'WhatsApp no está conectado: conéctalo en Canales.');
+    let digits = d.phone.replace(/\D/g, '');
+    // Celular colombiano sin el código del país (3XX XXX XXXX) → +57.
+    if (!d.phone.trim().startsWith('+') && digits.length === 10 && digits.startsWith('3')) digits = '57' + digits;
+    if (digits.length < 8 || digits.length > 15) throw new ApiError(400, 'Número inválido: escríbelo con el código del país, p. ej. +57 300 123 4567.');
+    // Fuera de la ventana de 24 h (un chat nuevo siempre lo está) WhatsApp solo acepta plantillas aprobadas.
+    const tpl = ctx.templates.find((t) => t.id === d.templateId);
+    if (!tpl || tpl.status !== 'APPROVED') throw new ApiError(400, 'Elige una plantilla aprobada por Meta.');
+    // Si ya hay chat con ese número (o con ese teléfono anotado), se usa el mismo.
+    let conv = await getDoc<Conversation>(tenant.id, 'conversations', conversationId('whatsapp', digits));
+    if (!conv) {
+      const r = await pool.query(`SELECT id FROM conversations WHERE tenant_id = $1 AND data->>'channel' = 'whatsapp' AND data->>'phone' = $2 LIMIT 1`, [tenant.id, '+' + digits]);
+      if (r.rows[0]) conv = await getDoc<Conversation>(tenant.id, 'conversations', String(r.rows[0].id));
+    }
+    if (conv?.optOutAt) throw new ApiError(409, 'Este cliente pidió no recibir más mensajes: no se le puede escribir primero.');
+    const name = d.name?.trim() || conv?.name || '+' + digits;
+    if (!conv) {
+      // Lo atiende el asesor que lo inició: el bot queda en pausa para este chat.
+      conv = { ...newConversation('whatsapp', digits, name, now, '+' + digits), botActive: false };
+      await putDoc(tenant.id, 'conversations', conv);
+    }
+    // El asesor confirma el permiso del cliente (opt-in que exige WhatsApp) y queda registrado quién y cuándo.
+    const tags = conv.tags.filter((t) => t !== OPT_IN_TAG).concat(OPT_IN_TAG);
+    await txEmit(async (c) => {
+      await patchDoc(tenant.id, 'conversations', conv!.id, { optInAt: conv!.optInAt ?? now, tags }, c);
+      await insertMessage(tenant.id, noteMessage(conv!.id, `✅ ${user.name} confirmó que ${name} autorizó que le escribamos por WhatsApp.`, now - 1), c);
+    });
+    const [draft] = templateDrafts(tpl, ctx.products, { nombre: name.startsWith('+') ? '' : name.split(' ')[0], producto: '', empresa: ctx.settings.companyName }, true);
+    await handlers.sendMessage({ conversationId: conv.id, draft: { ...draft, type: 'template' }, pauseBot: true }, args);
+    return { conversationId: conv.id };
   },
 
   createTestConversation: async (d, { tenant, now }) => {

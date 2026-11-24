@@ -46,6 +46,6 @@ export function templateDrafts(t: WaTemplate, products: Product[], vars: Templat
     text,
     footer: t.footer,
     buttons: t.buttons,
-    ...(asTemplate ? { templateName: t.name, templateParams: params } : {}),
+    ...(asTemplate ? { templateName: t.name, templateParams: params, templateLanguage: t.language } : {}),
   }];
 }
