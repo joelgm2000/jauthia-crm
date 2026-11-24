@@ -140,6 +140,14 @@ await sleep(800);
 const joel = (await convs('adm')).find((c) => c.externalId === BSUID);
 check('Cliente con nombre de usuario (sin teléfono): llega a la bandeja con su nombre', !!joel && joel.name === 'Joel García' && joel.stage !== 'nuevo', JSON.stringify(joel)?.slice(0, 200));
 check('El bot le responde usando "recipient" (su BSUID), sin "to"', sentToBsuid().length > 0 && sentToBsuid().every((x) => x.body.to === undefined), seen.filter((x) => x.path === '2020202020202/messages').slice(-1));
+// El asesor sabe su teléfono (número de prueba de Meta: la lista de autorizados es por teléfono) → se le responde al teléfono.
+let r9 = await call('/api/action', { method: 'POST', jar: 'adm', body: { action: 'editConversation', data: { conversationId: joel.id, edit: { phone: '+57 318 719 4560' } } } });
+check('El asesor puede anotar el teléfono del cliente con nombre de usuario', r9.status === 200, r9.text);
+r9 = await call('/api/action', { method: 'POST', jar: 'adm', body: { action: 'sendMessage', data: { conversationId: joel.id, draft: { type: 'text', text: 'Hola Joel, te escribe Wendy' } } } });
+await sleep(800);
+const last = seen.filter((x) => x.path === '2020202020202/messages' && x.body?.text?.body === 'Hola Joel, te escribe Wendy').at(-1);
+check('Con el teléfono anotado se le responde a ese número ("to")', r9.status === 200 && last?.body?.to === '573187194560' && last.body.recipient === undefined, JSON.stringify([r9.status, r9.text.slice(0,200), last?.body]));
+check('Teléfono inválido: 400', (await call('/api/action', { method: 'POST', jar: 'adm', body: { action: 'editConversation', data: { conversationId: joel.id, edit: { phone: '<script>' } } } })).status === 400);
 
 console.log('\nCoexistencia: lo que pasa en el celular');
 const sentBefore = seen.filter((x) => x.path === '2020202020202/messages').length;

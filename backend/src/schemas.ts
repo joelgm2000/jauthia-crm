@@ -61,6 +61,7 @@ const draft = z.object({
 const fieldsShape = Object.fromEntries(EDITABLE_FIELDS.map((k) => [k, z.union([z.string().max(300), z.number()]).optional().nullable()]));
 const edit = z.object({
   name: short(80).optional(),
+  phone: z.string().max(25).regex(/^[+\d\s().-]*$/).nullable().optional(),
   fields: z.object(fieldsShape).optional(),
   tags: z.array(short(40)).max(30).optional(),
   priority: z.enum(['alta', 'normal']).optional(),

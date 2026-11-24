@@ -183,6 +183,10 @@
           <span class="avatar" [style.background]="c.avatarColor" style="width:64px;height:64px;font-size:22px">{{ c.name | initials }}</span>
           <input class="name-input" [ngModel]="c.name" (change)="store.editConversation(c.id, { name: $any($event.target).value })" />
           <small class="muted"><app-channel-icon [channel]="c.channel" [size]="13" /> {{ c.phone || c.externalId }}</small>
+          @if (c.channel === 'whatsapp' && !isPhoneId(c.externalId)) {
+            <!-- Escribió con nombre de usuario: Meta no manda su teléfono. Si el asesor lo conoce, se le responde a ese número. -->
+            <input class="input phone-input" placeholder="Teléfono del cliente (opcional)" title="El cliente escribió con su nombre de usuario de WhatsApp, por eso no vemos su número. Si lo sabes, anótalo y le responderemos a ese teléfono." [ngModel]="c.phone ?? ''" (change)="store.editConversation(c.id, { phone: $any($event.target).value || null })" />
+          }
         </div>
 
         <div class="block">

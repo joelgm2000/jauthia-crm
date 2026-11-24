@@ -18,6 +18,8 @@ export const EDITABLE_FIELDS = [
 /** Propiedades de la conversación que un asesor puede cambiar directamente. */
 export interface ConversationEdit {
   name?: string;
+  /** Teléfono del cliente (WhatsApp con nombre de usuario no lo manda): si se conoce, se le responde a ese número. null lo borra. */
+  phone?: string | null;
   fields?: ContactFields;
   tags?: string[];
   priority?: 'alta' | 'normal';
@@ -36,6 +38,10 @@ export interface ConversationEdit {
 export function applyEdit(conv: Conversation, edit: ConversationEdit): Partial<Conversation> {
   const patch: Partial<Conversation> = {};
   if (edit.name !== undefined) patch.name = edit.name.trim().slice(0, 80) || conv.name;
+  if (edit.phone !== undefined) {
+    const d = (edit.phone ?? '').replace(/\D/g, '');
+    patch.phone = d.length >= 7 ? '+' + d : undefined;
+  }
   if (edit.fields) {
     const fields: ContactFields = {};
     for (const k of EDITABLE_FIELDS) {

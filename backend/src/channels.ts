@@ -40,10 +40,20 @@ async function post(url: string, body: unknown, token?: string): Promise<SendRes
   return r.json;
 }
 
+/**
+ * A quién se le responde en WhatsApp: normalmente al mismo id que escribió (su teléfono o su BSUID).
+ * Si escribió con nombre de usuario (BSUID) y el asesor anotó su teléfono, se usa el teléfono
+ * (necesario con el número de prueba de Meta, cuya lista de autorizados es por teléfono).
+ */
+export function whatsappTarget(conv: Pick<Conversation, 'externalId' | 'phone'>): string {
+  const phone = (conv.phone ?? '').replace(/\D/g, '');
+  return !/^\d+$/.test(conv.externalId) && phone.length >= 7 ? phone : conv.externalId;
+}
+
 export async function sendToChannel(conv: Conversation, msg: ChatMessage, s: Secrets): Promise<string | undefined> {
   switch (conv.channel) {
     case 'whatsapp':
-      return sendWhatsApp(conv.externalId, msg, s);
+      return sendWhatsApp(whatsappTarget(conv), msg, s);
     case 'messenger':
     case 'instagram':
       return sendMeta(conv.externalId, msg, s);

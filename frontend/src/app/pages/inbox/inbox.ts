@@ -308,6 +308,11 @@ export class Inbox {
     if (c) this.store.editConversation(c.id, { assignedTo: id || null });
   }
 
+  /** El id de WhatsApp es un teléfono (no un BSUID de quien escribe con nombre de usuario). */
+  isPhoneId(id: string): boolean {
+    return /^\d+$/.test(id);
+  }
+
   /** Solo si el cliente pidió volver a recibir mensajes: quita el "no contactar". */
   allowMessages(): void {
     const c = this.conv();
