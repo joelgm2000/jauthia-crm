@@ -11,7 +11,7 @@ import {
 import { isOpen, nextOpening } from './hours';
 import { Conversation, CrmSettings, CrmTask, IntentAlert, IntentType, Product, ProductVariant, StageId } from './models';
 import { DEFAULT_OPT_IN, isOptOut, OPT_IN_BTN, OPT_IN_REPLY, OPT_IN_TAG, OPT_OUT_REPLY, OPT_OUT_TAG } from './optout';
-import { parseCorrection, parseNameCity } from './parse';
+import { isGreeting, parseCorrection, parseNameCity } from './parse';
 import {
   AVAIL_LABEL, BTN, cartText, cartValue, detectProducts, hasVariants, matchVariant, OutgoingDraft, parseVariantButton, productCard, productDetails, recommend, variantButtonId,
 } from './products';
@@ -376,7 +376,13 @@ class Run {
       return this.notUnderstood(node);
     }
 
-    // 7) Responder la pregunta actual.
+    // 7) Solo saludó otra vez ("Hola", "Buenas tardes"): no es un error ni un nombre; se le repite la pregunta con amabilidad.
+    if (!input.buttonId && isGreeting(text)) {
+      this.ask(node);
+      return;
+    }
+
+    // 8) Responder la pregunta actual.
     const answered = this.answer(node, input, text);
     if (answered) return;
 

@@ -28,11 +28,16 @@ export function isKnownCity(text: string, extra: string[] = []): boolean {
   return CITIES.has(t) || extra.some((x) => !!x && normalize(x) === t);
 }
 
+/** El mensaje es solo un saludo ("Hola", "Buenas tardes", "buen día!!"). */
+export function isGreeting(raw: string): boolean {
+  return /^(hola+|ola|buenas|buen(os)? d[ií]as?|buenas (tardes|noches)|hey|saludos|qu[eé] tal)[\s!.,¡]*$/i.test(raw.trim());
+}
+
 /** "Soy Mario de Valledupar" → { name: 'Mario', city: 'Valledupar' } */
 export function parseNameCity(raw: string, extraCities: string[] = []): { name?: string; city?: string } {
   let t = raw
     .replace(/[¡!¿?]/g, ' ')
-    .replace(/\b(hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches|que tal|qué tal|saludos)\b[,.]?/gi, ' ')
+    .replace(/\b(buenas tardes|buenas noches|buenos d[ií]as|buen d[ií]a|hola+|buenas|que tal|qué tal|saludos)\b[,.]?/gi, ' ')
     .replace(/\b(mi nombre es|me llamo|soy|habla|le escribe|te escribe)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
