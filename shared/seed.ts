@@ -157,18 +157,18 @@ export const SEED_TEMPLATES: WaTemplate[] = [
     header: 'EvoSport', body: '¡Hola {{1}}! 👋 Gracias por escribir a EvoSport. ¿Qué equipo estás buscando?',
     footer: 'Máquinas de gimnasio · Valledupar',
     buttons: [{ id: 'cat_cardio', title: 'Cardio' }, { id: 'cat_fuerza', title: 'Fuerza' }, { id: 'cat_peso', title: 'Peso libre' }],
-    status: 'APPROVED',
+    status: 'LOCAL',
   },
   {
     id: 'tpl_carrusel_trot', name: 'carrusel_trotadoras', category: 'MARKETING', kind: 'carousel', language: 'es',
     body: 'Estas son nuestras trotadoras más vendidas 🏃 Toca *Ver detalles* para ver la ficha técnica.',
-    buttons: [], productIds: ['trot-latte', 'trot-vigor', 'trot-evoflex'], status: 'APPROVED',
+    buttons: [], productIds: ['trot-latte', 'trot-vigor', 'trot-evoflex'], status: 'LOCAL',
   },
   {
     id: 'tpl_ficha', name: 'ficha_producto', category: 'MARKETING', kind: 'product', language: 'es',
     body: 'Te comparto la ficha de {{1}}. ¿Te gustaría que una asesora te envíe la cotización con tu descuento?',
     buttons: [{ id: 'quiero_cotizacion', title: 'Quiero cotización' }, { id: 'more_options', title: 'Ver otras opciones' }],
-    productIds: ['trot-evoflex'], status: 'APPROVED',
+    productIds: ['trot-evoflex'], status: 'LOCAL',
   },
   {
     id: 'tpl_cotizacion', name: 'cotizacion_enviada', category: 'UTILITY', kind: 'buttons', language: 'es',
@@ -176,13 +176,13 @@ export const SEED_TEMPLATES: WaTemplate[] = [
     body: 'Hola {{1}}, te enviamos la cotización de {{2}} con tu descuento. Pagando en efectivo o transferencia tienes 15 a 20 % de descuento.',
     footer: 'Envío e instalación gratis en Valledupar',
     buttons: [{ id: 'pagar', title: 'Quiero pagar' }, { id: 'apartar', title: 'Apartar' }, { id: 'asesor', title: 'Hablar con asesora' }],
-    status: 'APPROVED',
+    status: 'LOCAL',
   },
   {
     id: 'tpl_seguimiento', name: 'seguimiento_24h', category: 'MARKETING', kind: 'buttons', language: 'es',
     body: '¿Pudiste revisar la propuesta de EvoSport? Si quieres, te ayudo a elegir o ajustar la cotización.',
     buttons: [{ id: 'more_options', title: 'Ver otras opciones' }, { id: 'asesor', title: 'Hablar con asesora' }],
-    status: 'APPROVED',
+    status: 'LOCAL',
   },
   {
     id: 'tpl_remarketing', name: 'remarketing_evosport', category: 'MARKETING', kind: 'buttons', language: 'es',
@@ -195,7 +195,7 @@ export const SEED_TEMPLATES: WaTemplate[] = [
     id: 'tpl_pago', name: 'pago_confirmado', category: 'UTILITY', kind: 'text', language: 'es',
     header: '✅ Pago confirmado',
     body: '¡Gracias {{1}}! Recibimos tu pago. Te enviaremos la factura electrónica a {{2}} y coordinaremos la entrega e instalación.',
-    buttons: [], status: 'APPROVED',
+    buttons: [], status: 'LOCAL',
   },
 ];
 

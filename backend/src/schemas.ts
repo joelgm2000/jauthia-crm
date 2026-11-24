@@ -190,6 +190,8 @@ export const actionSchemas: Record<ApiAction, z.ZodType> = {
   saveProduct: z.object({ product }),
   removeProduct: z.object({ id }),
   saveTemplate: z.object({ template }),
+  submitTemplate: z.object({ id }),
+  syncTemplates: z.object({}).strict(),
   removeTemplate: z.object({ id }),
   saveChannel: z.object({ channel }),
   saveChannelSecrets: z.object({ channel: channelType, secrets: z.record(z.string().max(40), z.string().max(1000)) }),

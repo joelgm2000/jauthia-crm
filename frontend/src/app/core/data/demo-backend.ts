@@ -186,6 +186,12 @@ export class DemoBackend implements CrmBackend {
     deleteUser: async () => {
       throw new Error('En modo demo no se pueden eliminar usuarios');
     },
+    submitTemplate: async () => {
+      throw new Error('En modo demo no se envían plantillas a Meta');
+    },
+    syncTemplates: async () => {
+      throw new Error('En modo demo no hay conexión con Meta');
+    },
     startConversation: async () => {
       throw new Error('En modo demo no se pueden iniciar chats reales de WhatsApp');
     },

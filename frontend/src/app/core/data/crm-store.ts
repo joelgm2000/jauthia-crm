@@ -272,6 +272,12 @@ export class CrmStore {
   async saveTemplate(template: WaTemplate): Promise<void> {
     await this.call('saveTemplate', { template });
   }
+  async submitTemplate(id: string): Promise<WaTemplate['status']> {
+    return (await this.call('submitTemplate', { id })).status;
+  }
+  async syncTemplates(): Promise<ApiActions['syncTemplates']['res']> {
+    return this.call('syncTemplates', {});
+  }
   async removeTemplate(id: string): Promise<void> {
     await this.call('removeTemplate', { id });
   }

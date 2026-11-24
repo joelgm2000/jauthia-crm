@@ -3,6 +3,7 @@
  * Cada manejador recibe datos YA validados (schemas.ts) y solo toca datos del cliente activo.
  */
 import { deleteConversationFiles } from './inbox-files';
+import { submitToMeta, syncFromMeta } from './meta-templates';
 import { agentMessagePatch, applyEdit, BOT_PAUSED_NOTE, botToggle, stageChange } from '../../shared/actions';
 import { ApiAction, ApiActions } from '../../shared/api';
 import { DEFAULT_FLOW, FlowConfig } from '../../shared/flow';
@@ -16,7 +17,7 @@ import { testChannelConnection } from './channel-setup';
 import { ingest, invalidateCtx, loadCtx, notifyStageChange, publishTeam } from './core';
 import { getDoc, getSetting, insertMessage, patchDoc, pool, putDoc, putSetting, removeDoc, txEmit } from './db';
 import { log } from './log';
-import { SECRET_FIELDS, saveSecrets, secretsStatus } from './secrets';
+import { getSecrets, SECRET_FIELDS, saveSecrets, secretsStatus } from './secrets';
 
 export interface ActionContext {
   tenant: Tenant;
@@ -38,6 +39,14 @@ async function patchWithNote(tenantId: string, conv: Conversation, patch: Partia
     await patchDoc(tenantId, 'conversations', conv.id, patch, c);
     await insertMessage(tenantId, noteMessage(conv.id, note, at), c);
   });
+}
+
+/** Cuenta de WhatsApp (WABA) y token del cliente, para hablar con Meta. */
+async function waAccount(tenantId: string): Promise<{ wabaId: string; token: string }> {
+  const ch = (await loadCtx(tenantId)).channels.get('whatsapp');
+  const token = (await getSecrets(tenantId, 'whatsapp'))['accessToken'];
+  if (!ch?.wabaId || !token) throw new ApiError(409, 'Conecta WhatsApp en Canales (falta la cuenta de WhatsApp Business o el token).');
+  return { wabaId: ch.wabaId, token };
 }
 
 export const handlers: { [A in ApiAction]: Handler<A> } = {
@@ -177,9 +186,33 @@ export const handlers: { [A in ApiAction]: Handler<A> } = {
   },
   // Las plantillas las usa el remarketing (caché del cliente): se invalida al cambiarlas.
   saveTemplate: async (d, { tenant }) => {
+    // El estado lo decide Meta (enviar / sincronizar), no el formulario. Si cambia el contenido de una plantilla
+    // que ya está en Meta, deja de coincidir con la aprobada: vuelve a "LOCAL" hasta que se envíe de nuevo.
+    const prev = await getDoc<WaTemplate>(tenant.id, 'templates', d.template.id);
+    const same = prev && ['name', 'language', 'category', 'body', 'header', 'footer', 'imageUrl'].every((k) => (prev as unknown as Record<string, unknown>)[k] === (d.template as unknown as Record<string, unknown>)[k])
+      && JSON.stringify(prev.buttons.map((b) => b.title)) === JSON.stringify(d.template.buttons.map((b) => b.title));
+    d.template.status = prev && same ? prev.status : 'LOCAL';
     await putDoc<WaTemplate>(tenant.id, 'templates', d.template);
     invalidateCtx(tenant.id);
     return null;
+  },
+  submitTemplate: async (d, { tenant }) => {
+    const { wabaId, token } = await waAccount(tenant.id);
+    const t = await getDoc<WaTemplate>(tenant.id, 'templates', d.id);
+    if (!t) throw new ApiError(404, 'La plantilla no existe');
+    const status = await submitToMeta(t, wabaId, token);
+    await patchDoc<WaTemplate>(tenant.id, 'templates', t.id, { status });
+    invalidateCtx(tenant.id);
+    return { status };
+  },
+  syncTemplates: async (_d, { tenant }) => {
+    const { wabaId, token } = await waAccount(tenant.id);
+    const { updated, added } = await syncFromMeta((await loadCtx(tenant.id)).templates, wabaId, token);
+    for (const t of [...updated, ...added]) await putDoc<WaTemplate>(tenant.id, 'templates', t);
+    invalidateCtx(tenant.id);
+    const all = [...updated, ...added];
+    const n = (s: WaTemplate['status']) => all.filter((t) => t.status === s).length;
+    return { approved: n('APPROVED'), pending: n('PENDING'), rejected: n('REJECTED'), local: n('LOCAL'), added: added.length };
   },
   removeTemplate: async (d, { tenant }) => {
     await removeDoc(tenant.id, 'templates', d.id);

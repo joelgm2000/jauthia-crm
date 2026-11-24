@@ -41,6 +41,7 @@ const PHONES = {
   1020304050607: { id: '2020202020202', display_phone_number: '+57 300 000 0001', verified_name: 'EvoSport', is_on_biz_app: true, platform_type: 'CLOUD_API' },
   3030303030303: { id: '4040404040404', display_phone_number: '+57 300 000 0002', verified_name: 'Otra Empresa', is_on_biz_app: false, platform_type: 'CLOUD_API' },
 };
+const metaTemplates = [{ name: 'hecha_en_manager', language: 'es_CO', category: 'UTILITY', status: 'APPROVED', components: [{ type: 'BODY', text: 'Hola {{1}}, tu pedido va en camino.' }, { type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: 'Gracias' }] }] }];
 const send = (res, status, body) => res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
 const mock = createServer((req, res) => {
   let raw = '';
@@ -60,6 +61,13 @@ const mock = createServer((req, res) => {
     if (/^\d+\/subscribed_apps$/.test(path)) return send(res, 200, { success: true });
     if (/^\d+\/smb_app_data$/.test(path)) return send(res, 200, { request_id: 'req_' + body?.sync_type });
     if (/^\d+\/register$/.test(path)) return send(res, 200, { success: true });
+    // Plantillas en la cuenta de WhatsApp: crear (queda en revisión) y listar con su estado real.
+    if (/^\d+\/message_templates$/.test(path) && req.method === 'POST') {
+      if (!body?.components?.some((c) => c.type === 'BODY')) return send(res, 400, { error: { message: 'Invalid parameter', error_user_msg: 'Falta el cuerpo' } });
+      metaTemplates.push({ name: body.name, language: body.language, category: body.category, status: 'PENDING', components: body.components });
+      return send(res, 200, { id: 'tplid_' + body.name, status: 'PENDING', category: body.category });
+    }
+    if (/^\d+\/message_templates$/.test(path)) return send(res, 200, { data: metaTemplates });
     // Archivos del cliente: primero la URL temporal, luego los bytes (con el mismo token).
     if ((m = path.match(/^media_(img|pdf)$/))) return send(res, 200, { url: `http://localhost:3197/graph/dl/${m[1]}`, mime_type: m[1] === 'img' ? 'image/jpeg' : 'application/pdf', file_size: 12 });
     if ((m = path.match(/^dl\/(img|pdf)$/))) return res.writeHead(200, { 'Content-Type': 'application/octet-stream' }).end(m[1] === 'img' ? Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]) : Buffer.from('%PDF-1.4 recibo'));
@@ -194,6 +202,9 @@ check('Al borrar el chat se borran sus archivos', dbRow.status === 200 && (await
 const act2 = (action, data) => call('/api/action', { method: 'POST', jar: 'adm', body: { action, data } });
 await act2('saveTemplate', { template: { id: 'tpl_bienvenida', name: 'bienvenida', category: 'UTILITY', kind: 'text', language: 'es_CO', body: 'Hola {{1}}, te escribe el equipo. ¿Seguimos con tu pedido?', buttons: [], status: 'APPROVED' } });
 await act2('saveTemplate', { template: { id: 'tpl_borrador', name: 'borrador', category: 'UTILITY', kind: 'text', language: 'es', body: 'Hola', buttons: [], status: 'PENDING' } });
+// Meta ya la aprobó (en el CRM nunca se marca a mano): se sincroniza el estado.
+metaTemplates.push({ name: 'bienvenida', language: 'es_CO', category: 'UTILITY', status: 'APPROVED', components: [{ type: 'BODY', text: 'Hola {{1}}, te escribe el equipo. ¿Seguimos con tu pedido?' }] });
+await act2('syncTemplates', {});
 let nc = await act2('startConversation', { phone: '300 555 1234', name: 'Marta Ruiz', templateId: 'tpl_bienvenida', consent: true });
 await sleep(800);
 const ncSent = seen.filter((x) => x.path === '2020202020202/messages' && x.body?.to === '573005551234').at(-1);
@@ -209,6 +220,26 @@ check('Si ya existe el chat, se usa el mismo', nc.status === 200 && nc.json.resu
 await hook(change('messages', { messaging_product: 'whatsapp', metadata: meta222, contacts: [{ wa_id: '573005551234', profile: { name: 'Marta' } }], messages: [{ from: '573005551234', id: 'wamid.stopm', timestamp: '1795496600', type: 'text', text: { body: 'STOP' } }] }));
 await sleep(800);
 check('A quien pidió la baja no se le puede escribir primero: 409', (await act2('startConversation', { phone: '3005551234', templateId: 'tpl_bienvenida', consent: true })).status === 409);
+
+// Plantillas ↔ Meta: el estado lo dice Meta, no el formulario.
+let tr = await act2('saveTemplate', { template: { id: 'tpl_falsa', name: 'falsa_aprobada', category: 'UTILITY', kind: 'text', language: 'es', body: 'Hola {{1}}, gracias por tu compra.', buttons: [], status: 'APPROVED' } });
+let tpls = (await call('/api/bootstrap', { jar: 'adm' })).json.templates;
+check('No se puede marcar "aprobada" a mano: queda "solo en el CRM"', tr.status === 200 && tpls.find((t) => t.id === 'tpl_falsa')?.status === 'LOCAL', tpls.find((t) => t.id === 'tpl_falsa'));
+tr = await act2('submitTemplate', { id: 'tpl_falsa' });
+const sentTpl = seen.filter((x) => x.path === '1020304050607/message_templates' && x.method === 'POST').at(-1);
+check('"Enviar a Meta" la crea en la cuenta con ejemplo para cada variable y queda en revisión', tr.status === 200 && tr.json.result.status === 'PENDING' && sentTpl?.body?.name === 'falsa_aprobada' && sentTpl.body.components.find((c) => c.type === 'BODY')?.example?.body_text?.[0]?.length === 1, [tr.text, sentTpl?.body]);
+tr = await act2('saveTemplate', { template: { id: 'tpl_mala', name: 'mala', category: 'UTILITY', kind: 'text', language: 'es', body: 'Hola {{1}} y {{3}} gracias', buttons: [], status: 'LOCAL' } });
+check('Variables saltadas ({{1}} y {{3}}): no se envía y explica por qué', (await act2('submitTemplate', { id: 'tpl_mala' })).json?.error?.includes('seguidas'));
+metaTemplates.find((t) => t.name === 'falsa_aprobada').status = 'APPROVED';
+tr = await act2('syncTemplates', {});
+tpls = (await call('/api/bootstrap', { jar: 'adm' })).json.templates;
+check('"Sincronizar" trae el estado real: la aprobada en Meta queda aprobada', tr.status === 200 && tpls.find((t) => t.id === 'tpl_falsa')?.status === 'APPROVED', tr.text);
+check('Las que no existen en Meta quedan "solo en el CRM" (ya no aparecen como aprobadas)', tpls.find((t) => t.id === 'tpl_borrador')?.status === 'LOCAL');
+const fromManager = tpls.find((t) => t.name === 'hecha_en_manager');
+check('Trae las plantillas creadas en WhatsApp Manager', fromManager?.status === 'APPROVED' && fromManager.language === 'es_CO' && fromManager.buttons[0]?.title === 'Gracias', fromManager);
+tr = await act2('saveTemplate', { template: { ...tpls.find((t) => t.id === 'tpl_falsa'), body: 'Hola {{1}}, gracias por tu compra en la tienda.' } });
+tpls = (await call('/api/bootstrap', { jar: 'adm' })).json.templates;
+check('Si se cambia el texto de una aprobada, vuelve a "solo en el CRM" (hay que reenviarla)', tpls.find((t) => t.id === 'tpl_falsa')?.status === 'LOCAL');
 
 console.log('\nCoexistencia: lo que pasa en el celular');
 const sentBefore = seen.filter((x) => x.path === '2020202020202/messages').length;

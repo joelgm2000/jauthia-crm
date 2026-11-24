@@ -70,6 +70,10 @@ export interface ApiActions {
   removeProduct: { req: { id: string }; res: void };
   saveTemplate: { req: { template: WaTemplate }; res: void };
   removeTemplate: { req: { id: string }; res: void };
+  /** Envía la plantilla a Meta para aprobación. */
+  submitTemplate: { req: { id: string }; res: { status: WaTemplate['status'] } };
+  /** Trae de Meta el estado real de las plantillas (y las creadas en WhatsApp Manager). */
+  syncTemplates: { req: Record<string, never>; res: { approved: number; pending: number; rejected: number; local: number; added: number } };
   saveChannel: { req: { channel: ChannelConfig }; res: void };
   /** Tokens de la red: se guardan cifrados y nunca se devuelven. "" borra un campo. */
   saveChannelSecrets: { req: { channel: ChannelType; secrets: Record<string, string> }; res: { status: Record<string, string> } };
@@ -87,7 +91,7 @@ export interface ApiActions {
 export type ApiAction = keyof ApiActions;
 
 export const ADMIN_ACTIONS: ApiAction[] = [
-  'deleteConversation', 'saveProduct', 'removeProduct', 'saveTemplate', 'removeTemplate', 'saveChannel',
+  'deleteConversation', 'saveProduct', 'removeProduct', 'saveTemplate', 'removeTemplate', 'submitTemplate', 'syncTemplates', 'saveChannel',
   'saveChannelSecrets', 'testChannel', 'saveSettings', 'saveFlow', 'seedDefaults', 'listUsers', 'createUser', 'updateUser', 'deleteUser',
 ];
 
