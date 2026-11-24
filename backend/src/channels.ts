@@ -128,11 +128,16 @@ function cardPayload(c: ProductCard, base?: string): object {
   };
 }
 
+/** Teléfono → "to"; BSUID (cliente con nombre de usuario, p. ej. "CO.123…") → "recipient". */
+export function waRecipient(id: string): { to: string } | { recipient: string } {
+  return /^\d+$/.test(id) ? { to: id } : { recipient: id };
+}
+
 async function sendWhatsApp(to: string, m: ChatMessage, s: Secrets): Promise<string | undefined> {
   if (!s.whatsappToken || !s.phoneNumberId) throw new Error('WhatsApp no está configurado: completa el token y el Phone Number ID en Canales');
   let lastId: string | undefined;
   for (const payload of waPayloads(m, s.publicBaseUrl)) {
-    const res = await post(`${GRAPH_URL}/${s.phoneNumberId}/messages`, { messaging_product: 'whatsapp', recipient_type: 'individual', to, ...payload }, s.whatsappToken);
+    const res = await post(`${GRAPH_URL}/${s.phoneNumberId}/messages`, { messaging_product: 'whatsapp', recipient_type: 'individual', ...waRecipient(to), ...payload }, s.whatsappToken);
     lastId = res?.messages?.[0]?.id ?? lastId;
   }
   return lastId;

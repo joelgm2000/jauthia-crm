@@ -132,6 +132,15 @@ check('Llega a la empresa dueña del número (EvoSport) y el bot responde', !!ca
 check('No le llega a la otra empresa', !(await convs('otra')).some((c) => c.externalId === '573001112233'));
 check('Número que no es de ningún cliente: se ignora sin error', (await hook(change('messages', { metadata: { phone_number_id: '9090909090909' }, messages: [{ from: '1', id: 'x', type: 'text', text: { body: 'x' } }] }))).status === 200);
 
+// Cliente con nombre de usuario de WhatsApp: Meta no manda el teléfono, solo su BSUID (así llegó la prueba real del 23-nov-2026).
+const BSUID = 'CO.1884811385984903';
+const sentToBsuid = () => seen.filter((x) => x.path === '2020202020202/messages' && x.body?.recipient === BSUID);
+await hook(change('messages', { messaging_product: 'whatsapp', metadata: meta222, contacts: [{ profile: { name: 'Joel García', username: 'joelgm_co' }, user_id: BSUID, country_code: 'CO' }], messages: [{ from_user_id: BSUID, id: 'wamid.bsuid1', timestamp: '1795493016', type: 'text', text: { body: 'Hola' } }] }));
+await sleep(800);
+const joel = (await convs('adm')).find((c) => c.externalId === BSUID);
+check('Cliente con nombre de usuario (sin teléfono): llega a la bandeja con su nombre', !!joel && joel.name === 'Joel García' && joel.stage !== 'nuevo', JSON.stringify(joel)?.slice(0, 200));
+check('El bot le responde usando "recipient" (su BSUID), sin "to"', sentToBsuid().length > 0 && sentToBsuid().every((x) => x.body.to === undefined), seen.filter((x) => x.path === '2020202020202/messages').slice(-1));
+
 console.log('\nCoexistencia: lo que pasa en el celular');
 const sentBefore = seen.filter((x) => x.path === '2020202020202/messages').length;
 await hook(change('smb_message_echoes', { messaging_product: 'whatsapp', metadata: meta222, message_echoes: [{ from: '573000000001', to: '573001112233', id: 'wamid.echo1', timestamp: '1793000100', type: 'text', text: { body: 'Hola Carlos, te atiendo yo 😊' } }] }));

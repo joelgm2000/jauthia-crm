@@ -95,7 +95,10 @@ webhooksRouter.get('/:tenantId/whatsapp', tenantParam, verifyChallenge('whatsapp
 /** Lo mínimo que usamos del webhook de WhatsApp Cloud API. */
 interface WaReply { id?: string; title?: string }
 interface WaMessage {
-  from: string;
+  /** Teléfono del cliente. Falta cuando el cliente usa nombre de usuario de WhatsApp. */
+  from?: string;
+  /** Id del cliente para este negocio (BSUID), p. ej. "CO.1884811385984903". Llega siempre con los nombres de usuario. */
+  from_user_id?: string;
   id: string;
   type: string;
   text?: { body?: string };
@@ -106,7 +109,7 @@ interface WaMessage {
 interface WaValue {
   metadata?: { phone_number_id?: string };
   statuses?: { id: string; status: string }[];
-  contacts?: { wa_id: string; profile?: { name?: string } }[];
+  contacts?: { wa_id?: string; user_id?: string; profile?: { name?: string } }[];
   messages?: WaMessage[];
   /** Coexistencia: mensajes que el negocio envió desde la app del celular. */
   message_echoes?: { to?: string; id?: string; timestamp?: string; type?: string; text?: { body?: string } }[];
@@ -149,10 +152,14 @@ webhooksRouter.post('/:tenantId/whatsapp', tenantParam, async (req, res) => {
 /** Estados y mensajes entrantes de WhatsApp de un cliente. */
 async function handleWaValue(t: string, v: WaValue): Promise<void> {
   await each(v.statuses, 'whatsapp (estado)', t, (st) => updateStatus(t, st.id, (st.status === 'failed' ? 'failed' : st.status) as ChatMessage['status']));
-  const names = new Map((v.contacts ?? []).map((c) => [c.wa_id, c.profile?.name]));
+  const names = new Map<string, string | undefined>();
+  for (const c of v.contacts ?? []) for (const k of [c.wa_id, c.user_id]) if (k) names.set(k, c.profile?.name);
   await each(v.messages, 'whatsapp', t, async (m) => {
+    // Con nombre de usuario de WhatsApp, Meta no manda el teléfono: el cliente se identifica con su BSUID.
+    const id = m.from ?? m.from_user_id;
+    if (!id) return log.warn('Mensaje de WhatsApp sin remitente', { tenant: t, id: m.id });
     const { text, buttonId, isMedia } = readWaMessage(m);
-    await ingest(t, { channel: 'whatsapp', externalId: String(m.from), name: names.get(m.from), phone: '+' + m.from, channelMessageId: m.id, text: text.slice(0, 4000), buttonId, isMedia });
+    await ingest(t, { channel: 'whatsapp', externalId: String(id), name: names.get(id), phone: m.from ? '+' + m.from : undefined, channelMessageId: m.id, text: text.slice(0, 4000), buttonId, isMedia });
   });
 }
 
